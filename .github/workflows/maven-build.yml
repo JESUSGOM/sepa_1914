@@ -23,8 +23,6 @@ jobs:
           cache: maven
 
       # 3. Compila el proyecto completo
-      # Inyectamos los secretos como variables de entorno para que Spring los detecte
-      # He mantenido -DskipTests por seguridad inicial, pero puedes quitarlo si quieres que GitHub pase los tests reales
       - name: Build with Maven
         env:
           SPRING_DATASOURCE_URL: ${{ secrets.DB_URL }}
@@ -33,9 +31,10 @@ jobs:
         run: mvn -B clean package -DskipTests
 
       # 4. Guarda el archivo .jar generado como un artefacto
-      # Usamos la ruta exacta definida por el <finalName> en tu pom.xml
+      # Corregido: usamos comodines para asegurar que encuentre el archivo
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: sepa-admin-service-executable
-          path: admin-service/target/sepa-admin-service.jar
+          path: "**/target/*.jar"
+          if-no-files-found: error
