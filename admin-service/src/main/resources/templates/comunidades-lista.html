@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Mis Comunidades - SEPA 1914</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container mt-5">
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Panel de Gestión de Fincas</h2>
+    <a th:href="@{/comunidades/nueva}" class="btn btn-primary">+ Nueva Comunidad</a>
+</div>
+
+<table class="table table-striped shadow-sm">
+    <thead class="table-dark">
+    <tr>
+        <th>Nombre (AT-03)</th>
+        <th>ID Acreedor (AT-02)</th>
+        <th>IBAN de Cobro (AT-04)</th>
+        <th>Acciones</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="c : ${comunidades}">
+        <td th:text="${c.nombre}">Nombre</td>
+        <td th:text="${c.identificadorAcreedor}">ES00000...</td>
+        <td th:text="${c.iban}">IBAN</td>
+        <td>
+            <a th:href="@{/vecinos/lista(comunidadId=${c.id})}" class="btn btn-sm btn-info text-white">Ver Vecinos</a>
+        </td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>

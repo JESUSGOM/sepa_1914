@@ -1,0 +1,18 @@
+# Ignorar carpetas de compilación de TODOS los módulos
+**/target/
+target/
+
+# Ignorar archivos del IDE de la raíz y subcarpetas
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# SEGURIDAD: Ignorar propiedades con contraseñas en cualquier módulo
+**/src/main/resources/application.properties
+**/src/main/resources/application.yml
+
+# Archivos temporales y logs
+*.log
+.DS_Store

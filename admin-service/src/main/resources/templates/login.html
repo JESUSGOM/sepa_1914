@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Acceso - SEPA 1914 Admin</title>
+    <link rel="icon" type="image/jpeg" th:href="@{/images/logo.jpg}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .login-container { max-width: 400px; margin-top: 100px; }
+        .logo-img { width: 120px; height: auto; margin-bottom: 20px; border-radius: 15px; }
+    </style>
+</head>
+<body>
+<div class="container login-container">
+    <div class="card shadow border-0">
+        <div class="card-body text-center p-5">
+            <img th:src="@{/images/logo.jpg}" alt="Logo" class="logo-img">
+
+            <h3 class="mb-4 fw-bold text-secondary">Gestor de Fincas</h3>
+
+            <div th:if="${param.error}" class="alert alert-danger py-2" role="alert">
+                Usuario o clave incorrectos.
+            </div>
+            <div th:if="${param.logout}" class="alert alert-info py-2" role="alert">
+                Has cerrado sesión correctamente.
+            </div>
+
+            <form th:action="@{/login}" method="post">
+                <div class="mb-3 text-start">
+                    <label for="username" class="form-label small fw-bold">Usuario</label>
+                    <input type="text" id="username" name="username" class="form-control" required autofocus>
+                </div>
+                <div class="mb-4 text-start">
+                    <label for="password" class="form-label small fw-bold">Contraseña</label>
+                    <input type="password" id="password" name="password" class="form-control" required>
+                </div>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg shadow-sm">Entrar al Panel</button>
+                </div>
+            </form>
+
+            <div class="mt-4 border-top pt-3">
+                <p class="small text-muted">¿No tienes cuenta?
+                    <a th:href="@{/registro}" class="text-decoration-none">Regístrate aquí</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    <p class="text-center mt-3 text-muted small">&copy; 2026 SEPA 1914 Admin - Normativa Bancaria</p>
+</div>
+</body>
+</html>

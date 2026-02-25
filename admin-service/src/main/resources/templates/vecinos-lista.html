@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Vecinos - SEPA 1914</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container mt-5">
+<div class="card shadow">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <div>
+            <h4 class="mb-0" th:text="'Vecinos de: ' + ${comunidad.nombre}"></h4>
+            <small class="text-info" th:text="'ID Acreedor: ' + ${comunidad.identificadorAcreedor}"></small>
+        </div>
+        <div>
+            <a th:href="@{/comunidades/lista}" class="btn btn-outline-light btn-sm">Volver a Fincas</a>
+            <a th:href="@{/vecinos/nuevo(comunidadId=${comunidad.id})}" class="btn btn-success btn-sm">+ Añadir Propietario</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th>Nombre del Deudor</th>
+                <th>Referencia Mandato (AT-01)</th>
+                <th>IBAN (AT-07)</th>
+                <th>Acciones</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="v : ${vecinos}">
+                <td th:text="${v.nombre}"></td>
+                <td class="font-monospace" th:text="${v.referenciaMandato}"></td>
+                <td th:text="${v.iban}"></td>
+                <td>
+                    <button class="btn btn-outline-primary btn-sm">Editar</button>
+                </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(vecinos)}">
+                <td colspan="4" class="text-center text-muted">No hay vecinos registrados en esta comunidad.</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>
