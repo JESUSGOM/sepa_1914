@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEPA 1914 - Gestión de Fincas y Contabilidad</title>
+    <link rel="icon" type="image/jpeg" th:href="@{/images/logo.jpg}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; }
+
+        /* Sidebar Estilo Negro Premium */
+        .sidebar {
+            min-height: 100vh;
+            background-color: #212529 !important;
+            color: white !important;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            padding-bottom: 2rem;
+        }
+
+        .sidebar .nav-link {
+            color: #adb5bd !important;
+            text-decoration: none;
+            padding: 8px 20px;
+            display: block;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            border: none;
+            background: none;
+        }
+
+        .sidebar .nav-link i { margin-right: 10px; font-size: 1rem; }
+
+        .sidebar .nav-link:hover {
+            background: #343a40 !important;
+            color: #ffffff !important;
+            padding-left: 25px;
+        }
+
+        .sidebar .nav-link.active {
+            color: white !important;
+            background: #0d6efd !important;
+            font-weight: bold;
+        }
+
+        .sidebar-divider { border-top: 1px solid rgba(255,255,255,0.1); margin: 15px 0; }
+        .sidebar-heading {
+            font-size: 0.7rem;
+            font-weight: bold;
+            letter-spacing: 1.5px;
+            color: #6c757d;
+            padding: 10px 20px;
+            text-transform: uppercase;
+        }
+
+        .btn-logout {
+            color: #ff6b6b !important;
+            border-top: 1px solid rgba(255,255,255,0.1) !important;
+            margin-top: 20px;
+        }
+
+        /* Estilo para el banner de licencia */
+        .license-banner {
+            background-color: #dc3545;
+            color: white;
+            font-size: 0.75rem;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #fff;
+        }
+        .license-id {
+            display: block;
+            font-family: monospace;
+            background: rgba(0,0,0,0.2);
+            padding: 2px 5px;
+            margin-top: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div th:fragment="menu" class="col-md-3 col-lg-2 d-md-block sidebar collapse shadow">
+    <div class="position-sticky pt-3">
+
+        <div th:if="${softwareActivado == false}" class="px-3">
+            <div class="license-banner shadow-sm">
+                <i class="bi bi-shield-lock-fill me-1"></i> <strong>MODO EVALUACIÓN</strong>
+                <p class="mb-0 mt-1 opacity-75 small">Generación SEPA bloqueada. Facilite este ID para activar:</p>
+                <span class="license-id" th:text="${equipoID}">0000-0000-0000-0000</span>
+            </div>
+        </div>
+
+        <div class="px-3 mb-4">
+            <h5 class="text-white border-bottom pb-2">
+                <i class="bi bi-bank2 me-2"></i> SEPA 1914
+            </h5>
+            <div th:if="${session.comunidadSeleccionada}" class="mt-2">
+                <span class="badge bg-primary w-100 text-start p-2">
+                    <i class="bi bi-buildings-fill me-1"></i>
+                    <span th:text="${session.comunidadSeleccionada.nombre}">Comunidad Activa</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="sidebar-heading">General</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link text-white" th:href="@{/dashboard}"
+                   th:classappend="${activePage == 'dashboard' ? 'active' : ''}">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link text-white" th:href="@{/comunidades/lista}"
+                   th:classappend="${activePage == 'comunidades' ? 'active' : ''}">
+                    <i class="bi bi-buildings"></i> Comunidades
+                </a>
+            </li>
+            <li class="nav-item" th:if="${session.comunidadSeleccionada != null}">
+                <a class="nav-link text-white" th:href="@{/comunidades/detalle/{id}(id=${session.comunidadSeleccionada.id})}"
+                   th:classappend="${activePage == 'comunidad-detalle' ? 'active' : ''}">
+                    <i class="bi bi-info-square-fill text-warning"></i> Ficha Comunidad
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link text-white" th:href="@{/vecinos/lista(comunidadId=${session.comunidadSeleccionada != null ? session.comunidadSeleccionada.id : null})}"
+                   th:classappend="${activePage == 'vecinos' ? 'active' : ''}">
+                    <i class="bi bi-people"></i> Vecinos
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link text-white" th:href="@{/conceptos/maestro}"
+                   th:classappend="${activePage == 'maestro-conceptos' ? 'active' : ''}">
+                    <i class="bi bi-list-stars"></i> Maestro de Conceptos
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link text-white" th:href="@{/sepa/generar}"
+                   th:classappend="${activePage == 'sepa' ? 'active' : ''}">
+                    <i class="bi bi-file-earmark-binary"></i> Generar SEPA
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link text-white" th:href="@{/comunidades/historial-remesas}"
+                   th:classappend="${activePage == 'historial-remesas' ? 'active' : ''}">
+                    <i class="bi bi-clock-history"></i> Historial Remesas
+                </a>
+            </li>
+        </ul>
+
+        <div th:if="${session.comunidadSeleccionada != null}">
+
+            <div class="sidebar-heading mt-3">Tesorería Finca</div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/contabilidad/ver-gastos/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'gastos' ? 'active' : ''}">
+                        <i class="bi bi-file-earmark-text"></i> Facturas y Gastos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/bancos/movimientos/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'conciliar' ? 'active' : ''}">
+                        <i class="bi bi-check2-square"></i> Conciliar Ingresos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/bancos/importar/{id}(id=${session.comunidadSeleccionada.id})}">
+                        <i class="bi bi-cloud-upload"></i> Importar Banco (N43)
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/bancos/movimientos/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'extracto-banco' ? 'active' : ''}">
+                        <i class="bi bi-card-list"></i> Extracto de cuenta
+                    </a>
+                </li>
+            </ul>
+
+            <div class="sidebar-heading mt-3">Contabilidad Oficial</div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/contabilidad/apertura/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'apertura' ? 'active' : ''}">
+                        <i class="bi bi-door-open-fill"></i> Asiento de Apertura
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/contabilidad/diario/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'diario' ? 'active' : ''}">
+                        <i class="bi bi-journal-text"></i> Libro Diario
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/contabilidad/cuentas/lista/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'extracto' ? 'active' : ''}">
+                        <i class="bi bi-book"></i> Libro Mayor
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/contabilidad/balance-comprobacion/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'comprobacion' ? 'active' : ''}">
+                        <i class="bi bi-layout-three-columns"></i> Sumas y Saldos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/contabilidad/presupuestos/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'presupuestos' ? 'active' : ''}">
+                        <i class="bi bi-calculator"></i> Presupuesto Anual
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/contabilidad/liquidacion/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'liquidacion' ? 'active' : ''}">
+                        <i class="bi bi-graph-up-arrow"></i> Estado Liquidación
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/contabilidad/balance/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'balance' ? 'active' : ''}">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Balance Situación
+                    </a>
+                </li>
+            </ul>
+
+            <div class="sidebar-heading mt-3">Informes y Asamblea</div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/informes/convocatoria/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'convocatoria' ? 'active' : ''}">
+                        <i class="bi bi-megaphone"></i> Convocatoria Junta
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/informes/estado-cuentas/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'informe-cuentas' ? 'active' : ''}">
+                        <i class="bi bi-file-earmark-pdf"></i> Estado de Cuentas
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/informes/liquidacion-individual/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'liquidacion-individual' ? 'active' : ''}">
+                        <i class="bi bi-person-vcard"></i> Liquidación Propietario
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/informes/certificado-deudas/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'certificados' ? 'active' : ''}">
+                        <i class="bi bi-shield-check"></i> Certificado de Deudas
+                    </a>
+                </li>
+            </ul>
+
+            <div class="sidebar-heading mt-3">Configuración</div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/rutas/archivos}"
+                       th:classappend="${activePage == 'rutas' ? 'active' : ''}">
+                        <i class="bi bi-folder"></i> Rutas Archivos
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <ul class="nav flex-column mt-4">
+            <li class="nav-item px-2">
+                <form th:action="@{/logout}" method="post">
+                    <button type="submit" class="nav-link btn-logout border-0 bg-transparent w-100 text-start">
+                        <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                    </button>
+                </form>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div th:fragment="scripts">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</div>
+</body>
+</html>

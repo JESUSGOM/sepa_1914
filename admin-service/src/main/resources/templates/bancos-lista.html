@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Historial de Movimientos Bancarios - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
+                    <li class="breadcrumb-item active">Extracto Bancario</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div>
+                    <h1 class="h2 mb-0"><i class="bi bi-bank text-primary"></i> Extracto de Cuenta</h1>
+                    <p class="text-muted mb-0" th:text="${comunidad.nombre}">Nombre Comunidad</p>
+                </div>
+                <div class="btn-toolbar gap-2">
+                    <form th:action="@{/bancos/auto-conciliar/{id}(id=${comunidad.id})}" method="post">
+                        <button type="submit" class="btn btn-success shadow-sm"><i class="bi bi-magic"></i> Conciliación Inteligente</button>
+                    </form>
+                    <a th:href="@{/bancos/importar/{id}(id=${comunidad.id})}" class="btn btn-primary shadow-sm"><i class="bi bi-file-earmark-arrow-up"></i> Importar Norma 43</a>
+                </div>
+            </div>
+
+            <div th:if="${mensaje}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i><span th:text="${mensaje}">Mensaje</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm bg-white"><div class="card-body">
+                        <h6 class="text-uppercase small fw-bold text-muted">IBAN de Abono</h6>
+                        <p class="h5 mb-0 font-monospace text-primary" th:text="${comunidad.iban}">ES00...</p>
+                    </div></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm bg-white"><div class="card-body">
+                        <h6 class="text-uppercase small fw-bold text-muted">Movimientos Pendientes</h6>
+                        <p class="h5 mb-0 text-warning">
+                            <i class="bi bi-clock-history"></i>
+                            <span th:text="${#lists.size(movimientos.?[conciliado == false])}">0</span>
+                        </p>
+                    </div></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm bg-dark text-white"><div class="card-body text-end">
+                        <h6 class="text-uppercase small fw-bold opacity-75">Estado Actual</h6>
+                        <p class="h5 mb-0">EJERCICIO 2026</p>
+                    </div></div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body py-2 px-3 bg-white rounded d-flex justify-content-between align-items-center">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" id="btn-todos" class="btn btn-outline-secondary active">Todos</button>
+                        <button type="button" id="btn-pendientes" class="btn btn-outline-warning">Pendientes</button>
+                        <button type="button" id="btn-conciliados" class="btn btn-outline-success">Conciliados</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="tablaMovimientos">
+                            <thead class="table-dark small text-uppercase">
+                            <tr>
+                                <th class="ps-4">Fecha</th>
+                                <th>Concepto Detallado</th>
+                                <th class="text-center">Estado</th>
+                                <th class="text-end">Importe</th>
+                                <th class="text-center pe-4">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="m : ${movimientos}" th:classappend="${m.conciliado ? 'table-light opacity-75' : ''}">
+                                <td class="ps-4">
+                                    <div th:text="${#temporals.format(m.fechaOperacion, 'dd/MM/yyyy')}" class="fw-bold">01/01/2026</div>
+                                    <span class="d-none" th:text="${m.conciliado ? 'CONCILIADO' : 'PENDIENTE'}"></span>
+                                </td>
+                                <td class="col-concepto-container">
+                                    <div class="concepto-texto fw-semibold text-secondary" th:text="${m.concepto}" th:title="${m.concepto}">CONCEPTO</div>
+                                </td>
+                                <td class="text-center">
+                                    <span th:if="${m.conciliado}" class="badge bg-success-subtle text-success border border-success-subtle">CONCILIADO</span>
+                                    <span th:unless="${m.conciliado}" class="badge bg-warning-subtle text-warning border border-warning-subtle">PENDIENTE</span>
+                                </td>
+                                <td class="text-end fw-bold">
+                                    <span th:class="${m.signo == '1' or m.importe < 0 ? 'text-danger' : 'text-success'}">
+                                        <span th:text="${m.signo == '1' or m.importe < 0 ? '-' : ''}"></span><span th:text="${#numbers.formatDecimal(m.importe.abs(), 1, 2, 'COMMA')}">0,00</span> €
+                                    </span>
+                                </td>
+                                <<td class="text-center pe-4">
+                                <div class="btn-group shadow-sm" th:if="${!m.conciliado}">
+                                    <a th:href="@{/bancos/conciliar/{id}(id=${m.id})}" class="btn btn-sm btn-outline-primary" title="Conciliación">
+                                        <i class="bi bi-arrow-left-right"></i>
+                                    </a>
+                                    <button th:if="${m.signo == '1' or m.importe < 0}" type="button" class="btn btn-sm btn-outline-danger"
+                                            th:data-id="${m.id}"
+                                            th:data-concepto="${m.concepto}"
+                                            th:data-importe="${m.importe}"
+                                            onclick="prepararDevolucion(this.getAttribute('data-id'), this.getAttribute('data-concepto'), this.getAttribute('data-importe'))"
+                                            title="Procesar Devolución">
+                                        <i class="bi bi-person-dash-fill"></i>
+                                    </button>
+                                </div>
+                            </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDevolucion" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form th:action="@{/bancos/procesar-devolucion}" method="post">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-danger text-white py-2">
+                    <h6 class="modal-title fw-bold small text-uppercase">Registrar Devolución</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <input type="hidden" id="dev_movimientoId" name="movimientoId">
+                    <div class="p-3 bg-white border rounded mb-3">
+                        <div class="small fw-bold text-danger">Movimiento original:</div>
+                        <div id="dev_info_concepto" class="small text-muted"></div>
+                        <div class="fw-bold h5 mb-0" id="dev_info_importe"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Asignar Cargo a Propietario</label>
+                        <select name="vecinoId" class="form-select" required>
+                            <option value="">-- Seleccione Vecino --</option>
+                            <option th:each="v : ${comunidad.vecinos}" th:value="${v.id}" th:text="${v.nombre + ' - ' + v.vivienda}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-danger btn-sm">Generar Cargo por Devolución</button></div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+    /* Estilo para conceptos largos con expansión al pasar el ratón */
+    .col-concepto-container { max-width: 350px; position: relative; }
+    .concepto-texto {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: help;
+        transition: all 0.2s ease;
+    }
+    .concepto-texto:hover {
+        white-space: normal;
+        background: #fff3cd;
+        padding: 8px;
+        border-radius: 4px;
+        position: absolute;
+        z-index: 100;
+        width: 100%;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        border: 1px solid #ffeeba;
+    }
+    .bg-success-subtle { background-color: #d1e7dd !important; }
+    .bg-warning-subtle { background-color: #fff3cd !important; }
+    .table-hover tbody tr:hover { background-color: rgba(0,0,0,.02); }
+</style>
+
+<script th:inline="javascript">
+    $(document).ready(function() {
+        const tabla = $('#tablaMovimientos').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" },
+            "order": [ [ 0, 'desc' ] ],
+            "pageLength": 25
+        });
+        $('#btn-todos').on('click', function() {
+            $('.btn-group button').removeClass('active'); $(this).addClass('active');
+            tabla.column(2).search('').draw();
+        });
+        $('#btn-pendientes').on('click', function() {
+            $('.btn-group button').removeClass('active'); $(this).addClass('active');
+            tabla.column(2).search('PENDIENTE').draw();
+        });
+        $('#btn-conciliados').on('click', function() {
+            $('.btn-group button').removeClass('active'); $(this).addClass('active');
+            tabla.column(2).search('CONCILIADO').draw();
+        });
+    });
+
+    function prepararDevolucion(id, concepto, importe) {
+        document.getElementById('dev_movimientoId').value = id;
+        document.getElementById('dev_info_concepto').innerText = concepto;
+        document.getElementById('dev_info_importe').innerText = new Intl.NumberFormat('es-ES').format(Math.abs(importe)) + " €";
+        new bootstrap.Modal(document.getElementById('modalDevolucion')).show();
+    }
+</script>
+</body>
+</html>

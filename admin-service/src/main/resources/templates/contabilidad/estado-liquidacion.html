@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Estado de Liquidación - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-3 col-lg-2 d-md-block sidebar shadow-sm print-none"
+             style="position: sticky; top: 0; height: 100vh; overflow-y: auto; z-index: 1000;">
+            <div th:replace="~{layout :: menu}"></div>
+        </div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3"
+              th:with="ingReal=${totalRealIngreso ?: 0},
+                       gastReal=${totalReal ?: 0},
+                       resultado=${(totalRealIngreso ?: 0) - (totalReal ?: 0)}">
+
+            <nav aria-label="breadcrumb" class="mb-3 print-none">
+                <ol class="breadcrumb bg-white p-2 shadow-sm rounded-3">
+                    <li class="breadcrumb-item small"><a th:href="@{/comunidades/lista}" class="text-decoration-none"><i class="bi bi-houses"></i> Comunidades</a></li>
+                    <li class="breadcrumb-item small">
+                        <a th:href="@{/comunidades/detalle/{id}(id=${comunidad.id})}" th:text="${comunidad.nombre}" class="text-decoration-none text-dark fw-bold">Comunidad</a>
+                    </li>
+                    <li class="breadcrumb-item active small" aria-current="page">Estado de Liquidación</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                <div>
+                    <h1 class="h3 mb-1 text-dark fw-bold">
+                        <i class="bi bi-graph-up-arrow text-primary me-2"></i>Estado de Liquidación
+                    </h1>
+                    <p class="text-muted small mb-0">Análisis comparativo de Tesorería: <span class="fw-bold text-dark" th:text="${comunidad.nombre}">Nombre</span></p>
+                </div>
+                <div class="btn-group shadow-sm print-none">
+                    <button type="button" class="btn btn-sm btn-white border dropdown-toggle fw-bold" data-bs-toggle="dropdown">
+                        <i class="bi bi-calendar3 me-1"></i> Ejercicio <span th:text="${ejercicio}"></span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><h6 class="dropdown-header small">Cambiar Ejercicio</h6></li>
+                        <li th:each="anio : ${#numbers.sequence(2024, 2027)}">
+                            <a class="dropdown-item small"
+                               th:href="@{/contabilidad/liquidacion/{id}(id=${comunidad.id}, ano=${anio})}"
+                               th:text="'Ejercicio ' + ${anio}"></a>
+                        </li>
+                    </ul>
+                    <button onclick="window.print()" class="btn btn-sm btn-primary ms-2 shadow-sm">
+                        <i class="bi bi-printer-fill me-1"></i> Imprimir Liquidación
+                    </button>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm bg-success text-white h-100">
+                        <div class="card-body py-3">
+                            <h6 class="card-title text-white-50 small text-uppercase fw-bold mb-2">Ingresos Cobrados (Caja)</h6>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h2 class="mb-0 fw-bold" th:text="${#numbers.formatDecimal(ingReal, 1, 2, 'COMMA')} + ' €'">0,00 €</h2>
+                                <i class="bi bi-cash-stack fs-2 opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm bg-danger text-white h-100">
+                        <div class="card-body py-3">
+                            <h6 class="card-title text-white-50 small text-uppercase fw-bold mb-2">Gastos Pagados (Caja)</h6>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h2 class="mb-0 fw-bold" th:text="${#numbers.formatDecimal(gastReal, 1, 2, 'COMMA')} + ' €'">0,00 €</h2>
+                                <i class="bi bi-credit-card fs-2 opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm h-100"
+                         th:classappend="${resultado >= 0} ? 'bg-primary text-white' : 'bg-warning text-dark'">
+                        <div class="card-body py-3">
+                            <h6 class="card-title opacity-75 small text-uppercase fw-bold mb-2">Saldo Neto (Caja)</h6>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h2 class="mb-0 fw-bold" th:text="${#numbers.formatDecimal(resultado, 1, 2, 'COMMA')} + ' €'">0,00 €</h2>
+                                <i class="bi bi-bank fs-2 opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-4 rounded-3 overflow-hidden">
+                <div class="card-header bg-success text-white py-2 d-flex justify-content-between align-items-center cursor-pointer"
+                     data-bs-toggle="collapse" data-bs-target="#collapseIngresos" style="cursor: pointer;">
+                    <h6 class="mb-0 fw-bold small"><i class="bi bi-plus-circle me-2"></i> 1. RESUMEN DE INGRESOS (Grupo 7)</h6>
+                    <i class="bi bi-chevron-down"></i>
+                </div>
+                <div id="collapseIngresos" class="collapse show">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light text-secondary small text-uppercase">
+                                <tr>
+                                    <th class="ps-4 py-3">Concepto Ingreso</th>
+                                    <th class="text-end">Presu. (B1)</th>
+                                    <th class="text-end">Facturado (B3)</th>
+                                    <th class="text-end">Cobrado (B2)</th>
+                                    <th class="text-end">Pendiente (B4)</th>
+                                    <th class="text-center">Eficacia</th>
+                                </tr>
+                                </thead>
+                                <tbody class="small">
+                                <tr th:each="ing : ${informeIngresos}">
+                                    <td class="ps-4">
+                                        <a th:href="@{/contabilidad/cuenta/mayor/{id}(id=${ing.idCuenta}, ano=${ejercicio})}" class="text-decoration-none">
+                                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25 me-2" th:text="${ing.codigoCuenta}">700</span>
+
+                                            <i th:if="${ing.isDescuadrado()}"
+                                               class="bi bi-exclamation-triangle-fill text-danger me-1"
+                                               th:title="'¡ATENCIÓN! Descuadre detectado'"></i>
+
+                                            <span class="text-dark fw-bold" th:text="${ing.nombreCuenta}">Cuotas</span>
+                                        </a>
+                                    </td>
+                                    <td class="text-end text-muted font-monospace" th:text="${#numbers.formatDecimal(ing.importePresupuestado, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(ing.importeFacturado, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end fw-bold text-success font-monospace" th:text="${#numbers.formatDecimal(ing.importeReal, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end text-danger fw-bold" th:text="${#numbers.formatDecimal(ing.diferencia, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-center">
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-success" role="progressbar"
+                                                 th:style="'width: ' + ${ing.porcentajeCumplimientoReal} + '%;'"
+                                                 th:aria-valuenow="${ing.porcentajeCumplimientoReal}" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                        <span class="fw-bold" style="font-size: 0.65rem;" th:text="${#numbers.formatDecimal(ing.porcentajeCumplimientoReal, 1, 1, 'COMMA')} + '%'"></span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                                <tfoot class="bg-dark text-white fw-bold small border-top">
+                                <tr>
+                                    <td class="ps-4 py-3">TOTAL INGRESOS (COBROS REALES)</td>
+                                    <td class="text-end" th:text="${#numbers.formatDecimal(totalPresuIngreso ?: 0, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end text-info" th:text="${#numbers.formatDecimal(totalFacturadoIngreso ?: 0, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end text-warning fs-6" th:text="${#numbers.formatDecimal(totalRealIngreso ?: 0, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end">---</td>
+                                    <td class="text-center">---</td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-4 rounded-3 overflow-hidden">
+                <div class="card-header bg-danger text-white py-2 d-flex justify-content-between align-items-center cursor-pointer"
+                     data-bs-toggle="collapse" data-bs-target="#collapseGastos" style="cursor: pointer;">
+                    <h6 class="mb-0 fw-bold small"><i class="bi bi-dash-circle me-2"></i> 2. DETALLE DE GASTOS (Grupo 6)</h6>
+                    <i class="bi bi-chevron-down"></i>
+                </div>
+                <div id="collapseGastos" class="collapse show">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light text-secondary small text-uppercase">
+                                <tr>
+                                    <th class="ps-4 py-3">Cuenta de Gasto</th>
+                                    <th class="text-end">Presu. (C1)</th>
+                                    <th class="text-end">Recibido (C3)</th>
+                                    <th class="text-end">Pagado (C2)</th>
+                                    <th class="text-end">Dif. (C4)</th>
+                                    <th class="text-center">Desviación</th>
+                                </tr>
+                                </thead>
+                                <tbody class="small">
+                                <tr th:each="item : ${informe}">
+                                    <td class="ps-4">
+                                        <a th:href="@{/contabilidad/cuenta/mayor/{id}(id=${item.idCuenta}, ano=${ejercicio})}" class="text-decoration-none">
+                                            <span class="badge bg-secondary-subtle text-secondary border border-secondary border-opacity-25 me-2" th:text="${item.codigoCuenta}">600</span>
+                                            <span class="text-dark fw-bold" th:text="${item.nombreCuenta}">Nombre</span>
+                                        </a>
+                                    </td>
+                                    <td class="text-end fw-bold text-primary font-monospace"
+                                        th:text="${#numbers.formatDecimal(item.importePresupuestado, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(item.importeFacturado, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end fw-bold text-danger font-monospace" th:text="${#numbers.formatDecimal(item.importeReal, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end fw-bold"
+                                        th:classappend="${item.importeFacturado > item.importePresupuestado} ? 'text-danger' : 'text-success'"
+                                        th:text="${#numbers.formatDecimal(item.importePresupuestado - item.importeFacturado, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-center">
+                                        <span class="badge rounded-pill px-2 py-1"
+                                              th:classappend="${item.getPorcentajeCumplimientoFacturado() > 100} ? 'bg-danger' : 'bg-info'"
+                                              th:text="${#numbers.formatDecimal(item.getPorcentajeCumplimientoFacturado(), 1, 1, 'COMMA')} + '%'"></span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                                <tfoot class="bg-dark text-white fw-bold small border-top">
+                                <tr>
+                                    <td class="ps-4 py-3">TOTAL GASTOS (PAGOS REALES)</td>
+                                    <td class="text-end" th:text="${#numbers.formatDecimal(totalPresu ?: 0, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-info text-end" th:text="${#numbers.formatDecimal(totalFacturadoGasto ?: 0, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end text-warning fs-6" th:text="${#numbers.formatDecimal(totalReal ?: 0, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end">---</td>
+                                    <td class="text-center">---</td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-4 rounded-3 overflow-hidden border-start border-warning border-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center cursor-pointer"
+                     data-bs-toggle="collapse" data-bs-target="#collapseDeuda" style="cursor: pointer;">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i> 3. RECIBOS PENDIENTES (DEUDA EXTERNA)</h6>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-warning text-dark px-3 me-3 shadow-sm" th:text="${#lists.size(recibosPendientes ?: {})} + ' recibos'"></span>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+                <div id="collapseDeuda" class="collapse show">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light small text-uppercase">
+                                <tr>
+                                    <th class="ps-4 py-2">Propietario / Vivienda</th>
+                                    <th class="text-center">Emisión</th>
+                                    <th class="text-end">Cuota Anual</th>
+                                    <th class="text-end pe-4 text-danger">Saldo Deudor</th>
+                                </tr>
+                                </thead>
+                                <tbody class="small">
+                                <tr th:each="p : ${recibosPendientes}">
+                                    <td class="ps-4 py-2">
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-light text-secondary border me-2" style="font-size: 0.7rem; min-width: 38px;" th:text="${p.vecino.pisoPorton}">1A</span>
+                                            <span class="fw-bold text-dark" th:text="${p.vecino.nombre}">Herederos de Rosillo</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center text-muted" th:text="${#temporals.format(p.fechaEmision, 'dd/MM/yyyy')}"></td>
+                                    <td class="text-end" th:text="${#numbers.formatDecimal(p.importe, 1, 2, 'COMMA')} + ' €'"></td>
+                                    <td class="text-end pe-4 fw-bold text-danger" th:text="${#numbers.formatDecimal(p.importe - p.pagadoAcumulado, 1, 2, 'COMMA')} + ' €'"></td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(recibosPendientes)}">
+                                    <td colspan="4" class="text-center py-4 text-muted small">
+                                        <i class="bi bi-check-circle text-success d-block mb-1"></i> No hay deudas pendientes en este ejercicio.
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-2 print-none">
+                <div class="col-12 text-end">
+                    <div class="alert alert-light border small text-muted py-2 shadow-sm d-inline-block px-4">
+                        <i class="bi bi-shield-lock-fill text-primary me-2"></i>
+                        Certificación Contable Generada el <span th:text="${#temporals.format(#temporals.createNow(), 'dd/MM/yyyy HH:mm')}"></span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{layout :: scripts}"></div>
+
+<style>
+    .cursor-pointer { cursor: pointer; }
+    .sidebar { min-width: 240px; border-right: 1px solid #dee2e6; }
+    .font-monospace { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace !important; }
+
+    @media print {
+        body { background-color: #fff !important; }
+        .print-none, .btn-group, .breadcrumb, .sidebar, .progress { display: none !important; }
+        .col-md-9 { width: 100% !important; margin: 0 !important; padding: 0 !important; flex: 0 0 100% !important; max-width: 100% !important; }
+        .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; margin-bottom: 20px !important; }
+        .collapse:not(.show) { display: block !important; }
+        .bg-dark { background-color: #000 !important; color: #fff !important; }
+        .table-light { background-color: #f8f9fa !important; }
+        .card-header { border-bottom: 1px solid #dee2e6 !important; color: #000 !important; background-color: #fff !important; }
+        .text-white { color: #000 !important; }
+    }
+
+    .table th { font-size: 0.65rem; letter-spacing: 0.5px; border-top: none; }
+    .badge { font-weight: 700; font-size: 0.6rem; letter-spacing: 0.3px; }
+    .progress-bar { transition: width 0.6s ease; }
+</style>
+</body>
+</html>

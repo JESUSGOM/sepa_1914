@@ -1,0 +1,253 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Estado de Cuentas - SEPA 1914</title>
+    <style>
+        /* Optimizaciones para Flying Saucer (Motor PDF) */
+        @page {
+            size: A4;
+            margin: 1.5cm;
+            @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 8pt;
+                color: #666;
+            }
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #333;
+            line-height: 1.5;
+            font-size: 10pt;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #0d6efd;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            color: #0d6efd;
+            margin: 0;
+            font-size: 20pt;
+            text-transform: uppercase;
+        }
+
+        .header p {
+            margin: 2px 0;
+            font-size: 11pt;
+            font-weight: bold;
+        }
+
+        .info-box {
+            width: 100%;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+        }
+
+        .info-box td {
+            padding: 10px;
+            border: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+            table-layout: fixed;
+        }
+
+        th {
+            background-color: #212529;
+            color: #ffffff;
+            text-align: left;
+            padding: 10px;
+            text-transform: uppercase;
+            font-size: 9pt;
+            letter-spacing: 1px;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #eeeeee;
+            vertical-align: middle;
+        }
+
+        .section-title {
+            background-color: #e9ecef;
+            padding: 8px 12px;
+            font-weight: bold;
+            border-left: 6px solid #0d6efd;
+            margin: 25px 0 15px 0;
+            text-transform: uppercase;
+            font-size: 11pt;
+        }
+
+        .text-end { text-align: right; }
+        .fw-bold { font-weight: bold; }
+
+        .total-row {
+            background-color: #d1e7dd;
+            font-weight: bold;
+            font-size: 11pt;
+        }
+
+        .total-pasivo {
+            background-color: #cfe2ff;
+            font-weight: bold;
+            font-size: 11pt;
+        }
+
+        .alert-success {
+            color: #0f5132;
+            background-color: #d1e7dd;
+            border: 1px solid #badbcc;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .alert-danger {
+            color: #842029;
+            background-color: #f8d7da;
+            border: 1px solid #f5c2c7;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .footer-sign {
+            margin-top: 60px;
+        }
+
+        .signature-container {
+            width: 100%;
+        }
+
+        .signature-box {
+            float: right;
+            width: 250px;
+            text-align: center;
+        }
+
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 60px;
+            padding-top: 5px;
+        }
+
+        .resultado-positivo { color: #0f5132; }
+        .resultado-negativo { color: #842029; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Estado de Cuentas Anual</h1>
+    <p th:text="${comunidad.nombre}">NOMBRE DE LA COMUNIDAD</p>
+    <p th:text="'Ejercicio Contable: ' + ${anio}">2026</p>
+</div>
+
+<table class="info-box">
+    <tr>
+        <td width="50%">
+            <span class="fw-bold">CIF Comunidad:</span> <span th:text="${comunidad.identificadorAcreedor}">---</span>
+        </td>
+        <td width="50%" class="text-end">
+            <span class="fw-bold">Fecha Informe:</span> <span th:text="${fecha}">21/03/2026</span>
+        </td>
+    </tr>
+</table>
+
+<div class="section-title">1. Balance Patrimonial (Activo)</div>
+<table>
+    <thead>
+    <tr>
+        <th width="70%">Concepto (Bienes y Derechos)</th>
+        <th width="30%" class="text-end">Importe</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>Disponible en Cuenta Bancaria (Caja y Bancos)</td>
+        <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(balance.saldoBancos, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+    </tr>
+    <tr>
+        <td>Recibos Pendientes de Cobro (Morosidad)</td>
+        <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(balance.deudasVecinos, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+    </tr>
+    <tr>
+        <td>Otros Activos y Saldos Técnicos</td>
+        <td class="text-end" th:text="${#numbers.formatDecimal(balance.otrosActivos, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+    </tr>
+    <tr class="total-row">
+        <td class="fw-bold">TOTAL ACTIVO</td>
+        <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(balance.totalActivo, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+    </tr>
+    </tbody>
+</table>
+
+<div class="section-title">2. Fondos y Obligaciones (Pasivo)</div>
+<table>
+    <thead>
+    <tr>
+        <th width="70%">Concepto (Deudas y Patrimonio)</th>
+        <th width="30%" class="text-end">Importe</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>Facturas Pendientes de Pago (Proveedores)</td>
+        <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(balance.deudasProveedores, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+    </tr>
+    <tr>
+        <td>Fondos de Reserva Acumulados</td>
+        <td class="text-end" th:text="${#numbers.formatDecimal(balance.fondosReserva, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+    </tr>
+    <tr>
+        <td>
+            <span th:text="${balance.resultadoEjercicio >= 0 ? 'Excedente (Superávit) del Ejercicio' : 'Déficit (Pérdidas) del Ejercicio'}">Resultado</span>
+        </td>
+        <td class="text-end fw-bold"
+            th:classappend="${balance.resultadoEjercicio >= 0 ? 'resultado-positivo' : 'resultado-negativo'}"
+            th:text="${#numbers.formatDecimal(balance.resultadoEjercicio, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+    </tr>
+    <tr class="total-pasivo">
+        <td class="fw-bold">TOTAL PASIVO Y PATRIMONIO</td>
+        <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(balance.totalPasivo, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+    </tr>
+    </tbody>
+</table>
+
+<div class="section-title">3. Certificación del Administrador</div>
+
+<div th:if="${balance.totalActivo.compareTo(balance.totalPasivo) == 0}" class="alert-success">
+    <strong>CONTABILIDAD CUADRADA:</strong> Se certifica que a fecha de emisión de este informe, el balance patrimonial de la comunidad coincide con los registros bancarios y libros auxiliares.
+</div>
+
+<div th:unless="${balance.totalActivo.compareTo(balance.totalPasivo) == 0}" class="alert-danger">
+    <strong>AVISO IMPORTANTE:</strong> Se ha detectado una diferencia técnica entre el Activo y el Pasivo. Este informe debe ser revisado por la administración antes de su aprobación definitiva.
+</div>
+
+<div class="footer-sign">
+    <div class="signature-container">
+        <div class="signature-box">
+            <p>Vº Bº El Administrador</p>
+            <div class="signature-line">
+                <small>Firma y Sello Oficial</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

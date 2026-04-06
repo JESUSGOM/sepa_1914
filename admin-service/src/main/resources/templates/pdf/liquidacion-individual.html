@@ -1,0 +1,179 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Liquidación Individual - SEPA 1914</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #333;
+            font-size: 10pt;
+            margin: 0;
+            padding: 0;
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        .header {
+            border-bottom: 2px solid #0d6efd;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .comunidad-nombre {
+            font-size: 14pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #0d6efd;
+        }
+        .titulo-informe {
+            font-size: 11pt;
+            color: #555;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        .propietario-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            margin-bottom: 20px;
+        }
+        .propietario-box table {
+            margin-bottom: 0;
+        }
+        .propietario-box td {
+            border: none;
+            padding: 3px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th {
+            background-color: #212529;
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-size: 9pt;
+            text-transform: uppercase;
+        }
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #eeeeee;
+        }
+        .text-end { text-align: right; }
+        .fw-bold { font-weight: bold; }
+
+        .estado-pendiente { color: #dc3545; font-weight: bold; }
+        .estado-cobrado { color: #198754; }
+
+        .resumen-final {
+            margin-top: 25px;
+            padding: 15px;
+            border: 1px solid #333;
+            background-color: #f1f1f1;
+        }
+        .resumen-final td {
+            border: none;
+            padding: 5px 0;
+        }
+        .footer {
+            margin-top: 40px;
+            font-size: 8pt;
+            text-align: center;
+            color: #6c757d;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+        .no-data {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+<div th:each="vecino, iterStat : ${vecinos}" th:class="${!iterStat.last} ? 'page-break' : ''">
+
+    <div class="header">
+        <div class="comunidad-nombre" th:text="${comunidad.nombre}">NOMBRE DE LA COMUNIDAD</div>
+        <div class="titulo-informe">Estado de Cuentas Individual - Ejercicio Contable 2026</div>
+    </div>
+
+    <div class="propietario-box">
+        <table>
+            <tr>
+                <td width="25%" class="fw-bold">Propietario:</td>
+                <td width="75%" th:text="${vecino.nombre}">Nombre del Vecino</td>
+            </tr>
+            <tr>
+                <td class="fw-bold">Vivienda / Ref:</td>
+                <td th:text="${vecino.vivienda} + ' ' + (${vecino.pisoPorton != null} ? ${vecino.pisoPorton} : '')">Vivienda</td>
+            </tr>
+            <tr>
+                <td class="fw-bold">CIF/NIF:</td>
+                <td th:text="${vecino.nif}">---</td>
+            </tr>
+        </table>
+    </div>
+
+    <p class="fw-bold" style="color: #0d6efd; border-bottom: 1px solid #0d6efd; display: inline-block; padding-bottom: 3px;">
+        DETALLE DE MOVIMIENTOS Y RECIBOS:
+    </p>
+
+    <table>
+        <thead>
+        <tr>
+            <th width="15%">Fecha</th>
+            <th width="45%">Concepto Detallado</th>
+            <th width="20%">Estado</th>
+            <th width="20%" class="text-end">Importe</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="recibo : ${recibosMap.get(vecino.id)}">
+            <td th:text="${#temporals.format(recibo.fechaEmision, 'dd/MM/yyyy')}">01/01/2026</td>
+            <td th:text="${recibo.concepto}">Cuota Ordinaria</td>
+            <td th:class="${recibo.estado.name() == 'PENDIENTE' || recibo.estado.name() == 'DEVUELTO'} ? 'estado-pendiente' : 'estado-cobrado'"
+                th:text="${recibo.estado}">ESTADO</td>
+            <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(recibo.importe, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(recibosMap.get(vecino.id))}">
+            <td colspan="4" class="no-data">No se han encontrado recibos emitidos para este propietario en el periodo actual.</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="resumen-final">
+        <table>
+            <tr>
+                <td class="fw-bold">TOTAL FACTURADO EN EL EJERCICIO (Previsión Anual):</td>
+                <td class="text-end fw-bold"
+                    th:text="${#numbers.formatDecimal(vecino.getImporteTotalConceptos() * 12, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+            </tr>
+            <tr style="border-top: 1px solid #333;">
+                <td class="fw-bold" style="font-size: 11pt;">SALDO PENDIENTE TOTAL (DEUDA A FECHA ACTUAL):</td>
+                <td class="text-end estado-pendiente" style="font-size: 11pt;"
+                    th:text="${#numbers.formatDecimal(saldos.get(vecino.id), 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+            </tr>
+        </table>
+    </div>
+
+    <p style="margin-top: 30px; font-size: 8.5pt; text-align: justify; color: #444;">
+        <strong>AVISO LEGAL:</strong> Conforme al Art. 15.2 de la Ley de Propiedad Horizontal (LPH), los propietarios que en el momento de iniciarse la junta no se encontrasen al corriente en el pago de todas las deudas vencidas con la comunidad y no hubiesen impugnado judicialmente las mismas o procedido al depósito judicial o notarial de la suma adeudada, podrán participar en sus deliberaciones si bien no tendrán derecho a voto.
+    </p>
+
+    <div class="footer">
+        Este documento es una liquidación informativa generada por <strong>SEPA 1914</strong> el
+        <span th:text="${#calendars.format(#calendars.createNow(), 'dd/MM/yyyy HH:mm')}">21/03/2026</span>.
+    </div>
+</div>
+
+</body>
+</html>

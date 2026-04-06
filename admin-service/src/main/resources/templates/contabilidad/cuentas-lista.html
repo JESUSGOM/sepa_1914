@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Plan de Cuentas - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+            <nav aria-label="breadcrumb" class="mb-2">
+                <ol class="breadcrumb mb-0 small">
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/detalle/{id}(id=${comunidad.id})}" th:text="${comunidad.nombre}">Comunidad</a></li>
+                    <li class="breadcrumb-item active">Libro Mayor</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-4">
+                <div>
+                    <h1 class="h4 mb-0"><i class="bi bi-grid-3x3-gap me-2 text-primary"></i>Plan de Cuentas</h1>
+                    <p class="text-muted small mb-0" th:text="${'Total: ' + totalItems + ' cuentas configuradas'}"></p>
+                </div>
+            </div>
+
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
+                <div th:each="cta : ${cuentas}" class="col">
+                    <div class="card h-100 border-0 shadow-sm card-hover transition">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <code class="fw-bold text-primary fs-5" th:text="${cta.codigo}">572000</code>
+                                <span class="badge rounded-pill"
+                                      th:classappend="${cta.tipo.name() == 'ACTIVO' ? 'bg-success-subtle text-success border border-success' :
+                                                       cta.tipo.name() == 'PASIVO' ? 'bg-danger-subtle text-danger border border-danger' : 'bg-light text-dark border'}"
+                                      th:text="${cta.tipo}">TIPO</span>
+                            </div>
+                            <h6 class="card-title text-dark fw-bold mb-3 text-truncate-2" th:text="${cta.nombre}">Nombre</h6>
+                        </div>
+                        <div class="card-footer bg-transparent border-0 pb-3">
+                            <a th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cta.id})}" class="btn btn-sm btn-primary w-100 shadow-sm">
+                                <i class="bi bi-journal-text me-1"></i> Ver Libro Mayor
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <nav th:if="${totalPages > 1}" aria-label="Navegación de cuentas">
+                <ul class="pagination pagination-sm justify-content-center">
+                    <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
+                        <a class="page-link" th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${currentPage - 1})}">Anterior</a>
+                    </li>
+
+                    <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}"
+                        th:classappend="${currentPage == i ? 'active' : ''}">
+                        <a class="page-link" th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${i})}" th:text="${i + 1}">1</a>
+                    </li>
+
+                    <li class="page-item" th:classappend="${currentPage == totalPages - 1 ? 'disabled' : ''}">
+                        <a class="page-link" th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${currentPage + 1})}">Siguiente</a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div th:if="${totalItems == 0}" class="text-center py-5">
+                <i class="bi bi-folder-x display-1 text-muted"></i>
+                <p class="h5 mt-3 text-muted">No hay cuentas contables en esta comunidad.</p>
+            </div>
+        </main>
+    </div>
+</div>
+
+<style>
+    .card-hover:hover { transform: translateY(-5px); box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.1)!important; }
+    .transition { transition: all 0.3s ease; }
+    .text-truncate-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 3rem; }
+    .pagination .page-link { border-radius: 5px; margin: 0 2px; border: none; color: #444; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .pagination .page-item.active .page-link { background-color: #0d6efd; color: white; }
+</style>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Certificado de Deudas - SEPA 1914</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2.5cm;
+        }
+        body {
+            font-family: 'Times New Roman', Times, serif; /* Tono más formal */
+            color: #000;
+            line-height: 1.6;
+            font-size: 11pt;
+            text-align: justify;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+        .comunidad-nombre {
+            font-size: 14pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-decoration: underline;
+        }
+        .titulo-certificado {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-top: 30px;
+            text-transform: uppercase;
+        }
+        .cuerpo {
+            margin-top: 40px;
+        }
+        .dato-resaltado {
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .deuda-box {
+            margin: 30px auto;
+            width: 80%;
+            padding: 20px;
+            border: 2px solid #000;
+            text-align: center;
+            font-size: 13pt;
+        }
+        .footer {
+            margin-top: 80px;
+        }
+        .fecha-lugar {
+            margin-bottom: 50px;
+        }
+        .firma-container {
+            width: 100%;
+            text-align: center;
+        }
+        .firma-linea {
+            margin: 0 auto;
+            width: 250px;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="comunidad-nombre" th:text="${comunidad.nombre}">NOMBRE DE LA COMUNIDAD</div>
+    <div class="titulo-certificado">CERTIFICADO DE ESTADO DE DEUDAS</div>
+</div>
+
+<div class="cuerpo">
+    <p>
+        D./Dña. <span class="dato-resaltado" th:text="${nombreAdministrador}"></span>, en su calidad de Secretario-Administrador de la Comunidad de Propietarios arriba referenciada,
+    </p>
+
+    <p style="font-weight: bold; font-size: 14pt; text-align: center; margin: 30px 0;">CERTIFICA:</p>
+
+    <p>
+        Que según los libros de contabilidad de esta Comunidad, consultados a fecha de hoy, la propiedad identificada como
+        <span class="dato-resaltado" th:text="${vecino.vivienda} + ' ' + (${vecino.pisoPorton != null} ? ${vecino.pisoPorton} : '')">VIVIENDA</span>,
+        perteneciente a <span class="dato-resaltado" th:text="${vecino.nombre}">NOMBRE DEL PROPIETARIO</span> con NIF/CIF
+        <span class="dato-resaltado" th:text="${vecino.nif}">---</span>:
+    </p>
+
+    <div th:if="${deudaTotal > 0}">
+        <p>Presenta a la fecha de emisión de este documento una deuda líquida, vencida y exigible por un importe total de:</p>
+        <div class="deuda-box">
+                <span style="font-size: 18pt; font-weight: bold;"
+                      th:text="${#numbers.formatDecimal(deudaTotal, 1, 2, 'COMMA')} + ' €'">0,00 €</span>
+        </div>
+        <p>Dicha cantidad corresponde a recibos y cuotas de comunidad pendientes de abono, según el desglose obrante en los archivos de la administración.</p>
+    </div>
+
+    <div th:unless="${deudaTotal > 0}">
+        <div class="deuda-box" style="background-color: #f9f9f9;">
+            <span style="font-weight: bold; text-transform: uppercase;">SE ENCUENTRA AL CORRIENTE DE PAGO</span>
+        </div>
+        <p>No constando, por tanto, deuda alguna pendiente con esta Comunidad de Propietarios a la fecha de emisión del presente certificado.</p>
+    </div>
+
+    <p style="margin-top: 30px;">
+        Y para que así conste a los efectos prevenidos en el artículo 9.1.e) de la Ley de Propiedad Horizontal, para la formalización de la escritura pública de transmisión de la vivienda, firmo el presente en:
+    </p>
+</div>
+
+<div class="footer">
+    <div class="fecha-lugar">
+        En <span th:text="${comunidad.poblacion}">POBLACIÓN</span>, a <span th:text="${fechaExtensa}">21 de marzo de 2026</span>.
+    </div>
+
+    <div class="firma-container">
+        <div class="firma-linea">
+            <p style="margin: 0; font-weight: bold;">Fdo. El Secretario-Administrador</p>
+            <p style="margin: 0; font-size: 9pt;">Sello de la Comunidad</p>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

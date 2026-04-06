@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Informe de Morosidad - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                <h1 class="h2"><i class="bi bi-person-exclamation text-danger"></i> Control de Impagados</h1>
+                <button class="btn btn-outline-danger" onclick="window.print()">
+                    <i class="bi bi-file-pdf"></i> Exportar Informe
+                </button>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm" th:if="${not #lists.isEmpty(informe)}">
+                <i class="bi bi-info-circle-fill me-2"></i>
+                Se han detectado <strong th:text="${informe.size()}">0</strong> vecinos con recibos pendientes o devueltos.
+            </div>
+
+            <div class="row">
+                <div class="col-12" th:each="info : ${informe}">
+                    <div class="card shadow-sm mb-3 border-0">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                            <div>
+                                <span class="h5 mb-0 fw-bold" th:text="${info.nombreVecino}">Nombre</span>
+                                <span class="badge bg-light text-dark ms-2" th:text="${info.vivienda}">1º A</span>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted d-block text-uppercase small fw-bold">Total Deuda</small>
+                                <span class="h4 mb-0 text-danger fw-bold" th:text="${#numbers.formatDecimal(info.totalDeuda, 1, 2, 'COMMA')} + ' €'">0 €</span>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm mb-0">
+                                <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Fecha Emisión</th>
+                                    <th>Estado</th>
+                                    <th class="text-end pe-4">Importe</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="r : ${info.recibosPendientes}">
+                                    <td class="ps-4" th:text="${#temporals.format(r.fechaEmision, 'dd/MM/yyyy')}"></td>
+                                    <td>
+                                            <span th:if="${r.estado.name() == 'DEVUELTO'}" class="text-danger fw-bold">
+                                                <i class="bi bi-arrow-counterclockwise"></i> DEVOLUCIÓN BANCARIA
+                                            </span>
+                                        <span th:if="${r.estado.name() == 'PENDIENTE'}" class="text-muted">
+                                                Pendiente de cobro
+                                            </span>
+                                    </td>
+                                    <td class="text-end pe-4" th:text="${#numbers.formatDecimal(r.importe, 1, 2, 'COMMA')} + ' €'"></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-footer bg-white text-end">
+                            <button class="btn btn-sm btn-primary">Enviar Recordatorio Email</button>
+                            <button class="btn btn-sm btn-outline-dark">Generar Carta Aviso</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${#lists.isEmpty(informe)}" class="text-center py-5">
+                <i class="bi bi-emoji-smile display-1 text-success"></i>
+                <h3 class="mt-3">¡Comunidad al día!</h3>
+                <p class="text-muted">No existen recibos pendientes de cobro.</p>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

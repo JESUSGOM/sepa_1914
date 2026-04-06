@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Conciliación Bancaria - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+            <nav aria-label="breadcrumb" class="small">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/comunidades/detalle/{id}(id=${comunidad.id})}" th:text="${comunidad.nombre}">Finca</a>
+                    </li>
+                    <li class="breadcrumb-item active">Conciliación Bancaria</li>
+                </ol>
+            </nav>
+
+            <div class="row align-items-center mb-3">
+                <div class="col-md-6">
+                    <h1 class="h4 mb-0"><i class="bi bi-bank2 text-primary me-2"></i>Conciliación de Ingresos</h1>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="button" class="btn btn-dark btn-sm shadow-sm border-0"
+                            style="background-color: #1a1d20;"
+                            onclick="abrirModalMesCompleto()">
+                        <i class="bi bi-calendar-check-fill me-1 text-warning"></i> Conciliar Remesa Mes Completo
+                    </button>
+                </div>
+            </div>
+
+            <div th:if="${param.exito}" class="alert alert-success py-2 small shadow-sm mb-3 border-0">
+                <i class="bi bi-check-circle-fill me-2"></i> Operación realizada correctamente.
+            </div>
+            <div th:if="${param.exito_masivo}" class="alert alert-primary py-2 small shadow-sm mb-3 border-0">
+                <i class="bi bi-stars me-2"></i> <strong>Abono Único:</strong> Se ha generado un solo apunte en banco para toda la selección.
+            </div>
+            <div th:if="${param.error}" class="alert alert-danger py-2 small shadow-sm mb-3 border-0">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> Error en la operación contable.
+            </div>
+
+            <div id="bulkActions" class="mb-2" style="display: none;">
+                <button type="button" class="btn btn-primary btn-sm shadow-sm" onclick="abrirModalMasivo()">
+                    <i class="bi bi-check-all me-1"></i> Conciliar marcados en esta página (<span id="selectedCount">0</span>)
+                </button>
+            </div>
+
+            <div class="card shadow-sm border-0 overflow-hidden">
+                <div class="card-header bg-white py-2 border-bottom d-flex justify-content-between align-items-center">
+                    <span class="text-muted small fw-bold text-uppercase">Registros en Página <span th:text="${currentPage + 1}">1</span></span>
+                    <span class="badge bg-light text-dark border" th:text="${totalItems + ' recibos totales'}">0 recibos</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0" id="tablaRecibos">
+                            <thead class="table-light">
+                            <tr class="small text-secondary" style="font-size: 0.7rem;">
+                                <th class="text-center" style="width: 45px;">
+                                    <input type="checkbox" class="form-check-input" id="checkAll" onclick="toggleAll(this)">
+                                </th>
+                                <th class="ps-3">FECHA EMISIÓN</th>
+                                <th>PROPIETARIO / VECINO</th>
+                                <th class="text-end">IMPORTE</th>
+                                <th class="text-center">ESTADO BANCARIO</th>
+                                <th class="text-end pe-3">ACCIÓN</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="r : ${recibos}" th:classappend="${r.cobrado ? 'bg-light opacity-75' : ''}">
+                                <td class="text-center">
+                                    <input th:unless="${r.cobrado}" type="checkbox" class="form-check-input recibo-check"
+                                           th:value="${r.id}" th:data-importe="${r.importe}" onclick="updateBulkUI()">
+                                    <i th:if="${r.cobrado}" class="bi bi-lock-fill text-muted small"></i>
+                                </td>
+                                <td class="ps-3 small" th:text="${#temporals.format(r.fechaEmision, 'dd/MM/yyyy')}"></td>
+                                <td>
+                                    <div class="fw-bold text-dark" style="font-size: 0.85rem;" th:text="${r.vecino.nombre}"></div>
+                                    <div class="text-muted" style="font-size: 0.7rem;" th:text="${r.vecino.pisoPorton}"></div>
+                                </td>
+                                <td class="text-end fw-bold">
+                                    <span th:text="${#numbers.formatDecimal(r.importe, 1, 2, 'COMMA')}">0,00</span>€
+                                </td>
+                                <td class="text-center">
+                                    <span th:if="${r.cobrado}" class="badge rounded-pill bg-success-subtle text-success border border-success border-opacity-10 px-2">
+                                        <i class="bi bi-check2 me-1"></i>Conciliado
+                                    </span>
+                                    <span th:unless="${r.cobrado}" class="badge rounded-pill bg-warning-subtle text-warning border border-warning border-opacity-10 px-2">
+                                        <i class="bi bi-clock me-1"></i>Pendiente
+                                    </span>
+                                </td>
+                                <td class="text-end pe-3">
+                                    <button th:unless="${r.cobrado}" type="button" class="btn btn-outline-success btn-xs"
+                                            th:onclick="abrirModalCobro([[${r.id}]], [[${r.vecino.nombre}]], [[${r.importe}]])">
+                                        <i class="bi bi-cash-coin"></i> Cobrar
+                                    </button>
+
+                                    <div th:if="${r.cobrado}" class="d-flex flex-column align-items-end">
+                                        <span class="text-muted small mb-1" style="font-size: 0.7rem;"
+                                              th:text="${#temporals.format(r.fechaCobroBanco, 'dd/MM/yy')}"></span>
+                                        <form th:action="@{/contabilidad/recibos/desconciliar/{id}(id=${r.id})}" method="post"
+                                              onsubmit="return confirm('¿Seguro que quieres anular la conciliación de este recibo y liberar el banco?')">
+                                            <button type="submit" class="btn btn-link text-danger p-0 border-0"
+                                                    style="font-size: 0.65rem; text-decoration: none;">
+                                                <i class="bi bi-arrow-counterclockwise"></i> Deshacer
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(recibos)}">
+                                <td colspan="6" class="text-center py-5 text-muted small">No hay recibos registrados.</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card-footer bg-white border-top py-2" th:if="${totalPages > 1}">
+                    <nav>
+                        <ul class="pagination pagination-sm justify-content-center mb-0">
+                            <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
+                                <a class="page-link" th:href="@{/contabilidad/recibos/{id}(id=${comunidad.id}, page=${currentPage - 1})}">«</a>
+                            </li>
+                            <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}"
+                                th:classappend="${currentPage == i ? 'active' : ''}">
+                                <a class="page-link" th:href="@{/contabilidad/recibos/{id}(id=${comunidad.id}, page=${i})}" th:text="${i + 1}">1</a>
+                            </li>
+                            <li class="page-item" th:classappend="${currentPage + 1 == totalPages ? 'disabled' : ''}">
+                                <a class="page-link" th:href="@{/contabilidad/recibos/{id}(id=${comunidad.id}, page=${currentPage + 1})}">»</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div class="modal fade" id="modalMesCompleto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <form th:action="@{/contabilidad/recibos/confirmar-mes-completo}" method="post">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h6 class="modal-title small">Conciliar Remesa Completa</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+                    <input type="hidden" name="mes" th:value="${#temporals.month(#temporals.createNow())}">
+                    <input type="hidden" name="anio" th:value="${#temporals.year(#temporals.createNow())}">
+
+                    <div class="text-muted small mb-2 text-uppercase">Abono Total Estimado</div>
+                    <div class="h3 text-primary mb-4 fw-bold">Calculando...</div>
+
+                    <div class="text-start">
+                        <label class="form-label small fw-bold">Fecha Abono en Extracto:</label>
+                        <input type="date" name="fechaCobro" class="form-control form-control-sm"
+                               th:value="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}" required>
+                    </div>
+                </div>
+                <div class="modal-footer p-2 border-0">
+                    <button type="submit" class="btn btn-primary btn-sm w-100 shadow">Procesar Abono Único</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalCobro" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <form th:action="@{/contabilidad/recibos/confirmar}" method="post">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white py-2">
+                    <h6 class="modal-title small">Conciliar Recibo</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <input type="hidden" name="reciboId" id="modalReciboId">
+                    <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+                    <div class="h4 text-success fw-bold"><span id="modalImporte">0,00</span> €</div>
+                    <p id="modalVecino" class="text-muted small mb-3"></p>
+                    <div class="text-start">
+                        <label class="form-label small fw-bold">Fecha de Abono:</label>
+                        <input type="date" name="fechaCobro" class="form-control form-control-sm"
+                               th:value="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}" required>
+                    </div>
+                </div>
+                <div class="modal-footer p-2 border-0">
+                    <button type="submit" class="btn btn-success btn-sm w-100">Asentar Individual</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalMasivo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <form th:action="@{/contabilidad/recibos/confirmar-masivo}" method="post">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h6 class="modal-title small">Conciliar Selección</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+                    <div id="masivoInputs"></div>
+                    <div class="h3 text-primary fw-bold mb-1"><span id="totalMasivo">0,00</span> €</div>
+                    <div class="text-muted small mb-4"><span id="countMasivo">0</span> recibos de esta página</div>
+
+                    <div class="text-start">
+                        <label class="form-label small fw-bold">Fecha Abono:</label>
+                        <input type="date" name="fechaCobro" class="form-control form-control-sm"
+                               th:value="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}" required>
+                    </div>
+                </div>
+                <div class="modal-footer p-2 border-0">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Asentar Agrupados</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    function abrirModalMesCompleto() {
+        new bootstrap.Modal(document.getElementById('modalMesCompleto')).show();
+    }
+
+    function abrirModalCobro(id, nombre, importe) {
+        document.getElementById('modalReciboId').value = id;
+        document.getElementById('modalVecino').innerText = nombre;
+        document.getElementById('modalImporte').innerText = new Intl.NumberFormat('es-ES').format(importe);
+        new bootstrap.Modal(document.getElementById('modalCobro')).show();
+    }
+
+    function toggleAll(source) {
+        const checkboxes = document.querySelectorAll('.recibo-check');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+        updateBulkUI();
+    }
+
+    function updateBulkUI() {
+        const selectedChecks = document.querySelectorAll('.recibo-check:checked');
+        const bulkActions = document.getElementById('bulkActions');
+        const countSpan = document.getElementById('selectedCount');
+        bulkActions.style.display = selectedChecks.length > 0 ? 'block' : 'none';
+        countSpan.innerText = selectedChecks.length;
+    }
+
+    function abrirModalMasivo() {
+        const selectedChecks = document.querySelectorAll('.recibo-check:checked');
+        let total = 0;
+        const container = document.getElementById('masivoInputs');
+        container.innerHTML = '';
+
+        selectedChecks.forEach(cb => {
+            total += parseFloat(cb.getAttribute('data-importe'));
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'reciboIds';
+            input.value = cb.value;
+            container.appendChild(input);
+        });
+
+        document.getElementById('totalMasivo').innerText = new Intl.NumberFormat('es-ES').format(total);
+        document.getElementById('countMasivo').innerText = selectedChecks.length;
+        new bootstrap.Modal(document.getElementById('modalMasivo')).show();
+    }
+</script>
+
+<style>
+    .btn-xs { padding: 0.1rem 0.4rem; font-size: 0.75rem; }
+    .table th { font-weight: 700; text-transform: uppercase; font-size: 0.65rem; color: #6c757d; }
+    .page-link { font-size: 0.75rem; padding: 0.3rem 0.6rem; color: #212529; border-radius: 4px; margin: 0 2px; }
+    .active > .page-link { background-color: #212529; border-color: #212529; color: #fff; }
+    .badge { font-size: 0.7rem; font-weight: 600; }
+</style>
+</body>
+</html>

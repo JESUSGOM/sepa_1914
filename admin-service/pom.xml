@@ -13,36 +13,34 @@
     <artifactId>admin-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>admin-service</name>
-    <description>admin-service</description>
+    <description>Servicio de Gestión de Fincas y Contabilidad SEPA 1914</description>
 
     <properties>
         <java.version>21</java.version>
+        <openpdf.version>1.3.30</openpdf.version>
+        <flying-saucer.version>9.1.22</flying-saucer.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
         <dependency>
@@ -57,19 +55,42 @@
         </dependency>
 
         <dependency>
+            <groupId>org.iban4j</groupId>
+            <artifactId>iban4j</artifactId>
+            <version>3.2.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>${openpdf.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.xhtmlrenderer</groupId>
+            <artifactId>flying-saucer-pdf-openpdf</artifactId>
+            <version>${flying-saucer.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
+        <finalName>sepa1914</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

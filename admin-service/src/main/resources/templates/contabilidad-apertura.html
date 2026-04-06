@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Asiento de Apertura - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-dark text-white p-3">
+                    <h5 class="mb-0"><i class="bi bi-door-open-fill me-2"></i> Registro de Saldo Inicial</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-info border-0 shadow-sm mb-4">
+                        <small class="text-uppercase fw-bold d-block">Comunidad Seleccionada:</small>
+                        <span class="h5" th:text="${comunidad.nombre}">Nombre Comunidad</span>
+                    </div>
+
+                    <form th:action="@{/contabilidad/guardar-apertura}" method="post">
+                        <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Fecha de Apertura</label>
+                            <input type="date" name="fecha" class="form-control" th:value="${fechaDefault}" required>
+                            <div class="form-text">Normalmente el primer día del ejercicio (01/01/2026).</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Cuenta Contable</label>
+                            <select name="cuentaId" class="form-select select2" required>
+                                <option value="">-- Selecciona la cuenta --</option>
+                                <option th:each="cta : ${cuentas}"
+                                        th:value="${cta.id}"
+                                        th:text="${cta.codigo + ' - ' + cta.nombre}">
+                                </option>
+                            </select>
+                            <div class="form-text">Selecciona '57200001' para el saldo del banco.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Importe Inicial (€)</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" name="importe" class="form-control form-control-lg" placeholder="0.00" required>
+                                <span class="input-group-text bg-primary text-white">€</span>
+                            </div>
+                            <div class="form-text text-danger">Para el fichero de Malgrat: 11039.19</div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-dark btn-lg">
+                                <i class="bi bi-save me-2"></i> Confirmar y Generar Asiento
+                            </button>
+                            <a th:href="@{/bancos/movimientos/{id}(id=${comunidad.id})}" class="btn btn-link text-muted">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

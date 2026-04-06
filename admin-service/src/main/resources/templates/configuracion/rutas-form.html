@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}"></head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+            <h2><i class="bi bi-folder-fill text-warning"></i> Configuración de Almacenamiento Local</h2>
+            <p class="text-muted">Define las carpetas de tu PC donde se guardarán automáticamente los archivos generados.</p>
+            <hr>
+
+            <div th:if="${mensaje}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i> <span th:text="${mensaje}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <form th:action="@{/rutas/guardar}" th:object="${config}" method="post" class="card p-4 shadow-sm border-0">
+                <input type="hidden" th:field="*{id}">
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Ruta para archivos bancarios (.C19)</label>
+                    <input type="text" th:field="*{rutaC19}" class="form-control" placeholder="Ej: C:/sepa1914/ficheros/remesas" required>
+                    <small class="text-secondary">Ruta absoluta donde se descargarán los ficheros de cuaderno bancario.</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Ruta para informes PDF</label>
+                    <input type="text" th:field="*{rutaPdf}" class="form-control" placeholder="Ej: C:/sepa1914/ficheros/informesPDF" required>
+                    <small class="text-secondary">Ubicación para los resúmenes y reportes PDF generados.</small>
+                </div>
+
+                <div class="mt-2">
+                    <button type="submit" class="btn btn-primary px-4 shadow-sm">
+                        <i class="bi bi-save me-1"></i> Guardar Configuración
+                    </button>
+                    <a th:href="@{/dashboard}" class="btn btn-outline-secondary px-4 ms-2">Cancelar</a>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

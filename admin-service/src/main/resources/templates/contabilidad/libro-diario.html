@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Libro Diario - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+            <nav aria-label="breadcrumb" class="mb-2">
+                <ol class="breadcrumb mb-0 small">
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/detalle/{id}(id=${comunidad.id})}" th:text="${comunidad.nombre}">Comunidad</a></li>
+                    <li class="breadcrumb-item active">Libro Diario</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <div>
+                    <h1 class="h4 mb-0">
+                        <i class="bi bi-journal-text text-success me-2"></i>Libro Diario Oficial
+                    </h1>
+                    <p class="text-muted small mb-0" th:text="${'Registro cronológico de operaciones - Ejercicio ' + ejercicio}"></p>
+                </div>
+
+                <div class="d-flex gap-2 align-items-center">
+                    <form th:action="@{/contabilidad/comunidades/{id}/renumerar-asientos(id=${comunidad.id})}" method="post" class="m-0">
+                        <input type="hidden" name="anio" th:value="${ejercicio}" />
+                        <button type="submit" class="btn btn-sm btn-warning shadow-sm fw-bold text-dark"
+                                onclick="return confirm('ATENCIÓN: ¿Estás seguro de que deseas renumerar TODOS los asientos del ejercicio?\n\nEsta acción ordenará la contabilidad cronológicamente y asignará números definitivos (1, 2, 3...). Solo debe hacerse al cerrar el año o si ya no vas a introducir facturas de fechas pasadas.')">
+                            <i class="bi bi-list-ol"></i> Cerrar Ejercicio
+                        </button>
+                    </form>
+
+                    <div class="btn-group shadow-sm">
+                        <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-printer me-1"></i> Imprimir Diario
+                        </button>
+                        <a th:href="@{/contabilidad/balance-comprobacion/{id}(id=${comunidad.id})}" class="btn btn-sm btn-primary">
+                            <i class="bi bi-layout-three-columns me-1"></i> Ver Sumas y Saldos
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${exito}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i><span th:text="${exito}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div th:if="${error}" class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i><span th:text="${error}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-body py-2 bg-white rounded">
+                    <form th:action="@{/contabilidad/diario/{id}(id=${comunidad.id})}" method="get" class="row g-2 align-items-center">
+                        <div class="col-auto">
+                            <label class="small fw-bold">Cambiar Ejercicio:</label>
+                        </div>
+                        <div class="col-auto">
+                            <select name="ano" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <option th:each="y : ${#numbers.sequence(2024, 2026)}"
+                                        th:value="${y}" th:text="${y}" th:selected="${y == ejercicio}"></option>
+                            </select>
+                        </div>
+                        <input type="hidden" name="page" value="0">
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0" id="tablaDiario">
+                            <thead class="bg-dark text-white small text-uppercase">
+                            <tr>
+                                <th class="ps-3 py-2 text-center" style="width: 8%">Asiento</th>
+                                <th class="text-center" style="width: 10%">Fecha</th>
+                                <th style="width: 10%">Cuenta</th>
+                                <th style="width: 42%">Concepto / Descripción del Apunte</th>
+                                <th class="text-end" style="width: 15%">Debe</th>
+                                <th class="text-end pe-3" style="width: 15%">Haber</th>
+                            </tr>
+                            </thead>
+                            <tbody class="small">
+                            <tr th:each="m, iterStat : ${movimientos}"
+                                th:with="claseAsiento=${iterStat.index > 0 && movimientos[iterStat.index-1].numeroAsiento == m.numeroAsiento ? 'mismo-asiento' : 'nuevo-asiento'}">
+
+                                <td class="ps-3 text-center fw-bold text-muted border-end"
+                                    th:text="${m.numeroAsiento}"
+                                    th:classappend="${claseAsiento}">
+                                </td>
+
+                                <td class="text-center" th:text="${#temporals.format(m.fecha, 'dd/MM/yyyy')}"></td>
+
+                                <td>
+                                    <a th:href="@{/contabilidad/cuenta/mayor/{id}(id=${m.cuenta.id})}"
+                                       class="fw-bold text-decoration-none" th:text="${m.cuenta.codigo}"></a>
+                                </td>
+
+                                <td class="text-truncate" style="max-width: 400px;" th:text="${m.concepto}"></td>
+
+                                <td class="text-end fw-bold"
+                                    th:text="${m.debe > 0 ? #numbers.formatDecimal(m.debe, 1, 2, 'COMMA') + ' €' : ''}"></td>
+                                <td class="text-end pe-3 fw-bold"
+                                    th:text="${m.haber > 0 ? #numbers.formatDecimal(m.haber, 1, 2, 'COMMA') + ' €' : ''}"></td>
+                            </tr>
+
+                            <tr th:if="${#lists.isEmpty(movimientos)}">
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
+                                    No existen registros contables para el ejercicio seleccionado.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <nav th:if="${totalPages > 1}" class="mt-4">
+                <ul class="pagination pagination-sm justify-content-center">
+                    <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
+                        <a class="page-link shadow-sm" th:href="@{/contabilidad/diario/{id}(id=${comunidad.id}, ano=${ejercicio}, page=${currentPage - 1})}"><i class="bi bi-chevron-left"></i></a>
+                    </li>
+                    <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}" th:classappend="${currentPage == i ? 'active' : ''}">
+                        <a class="page-link shadow-sm" th:href="@{/contabilidad/diario/{id}(id=${comunidad.id}, ano=${ejercicio}, page=${i})}" th:text="${i + 1}">1</a>
+                    </li>
+                    <li class="page-item" th:classappend="${currentPage == totalPages - 1 ? 'disabled' : ''}">
+                        <a class="page-link shadow-sm" th:href="@{/contabilidad/diario/{id}(id=${comunidad.id}, ano=${ejercicio}, page=${currentPage + 1})}"><i class="bi bi-chevron-right"></i></a>
+                    </li>
+                </ul>
+                <p class="text-center text-muted small" th:text="${'Operaciones ' + (currentPage * 20 + 1) + ' a ' + (currentPage * 20 + movimientos.size()) + ' de ' + totalItems}"></p>
+            </nav>
+
+            <div class="row mt-4 mb-5">
+                <div class="col-md-6 ms-auto">
+                    <div class="card border-0 shadow-sm bg-dark text-white">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small text-uppercase opacity-75">Total Debe (Página)</span>
+                                <h5 class="mb-0 fw-bold" th:text="${#numbers.formatDecimal(#aggregates.sum(movimientos.![debe]), 1, 2, 'COMMA')} + ' €'"></h5>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center border-top pt-2 opacity-75">
+                                <span class="small text-uppercase">Total Haber (Página)</span>
+                                <h5 class="mb-0 fw-bold" th:text="${#numbers.formatDecimal(#aggregates.sum(movimientos.![haber]), 1, 2, 'COMMA')} + ' €'"></h5>
+                            </div>
+                            <div class="text-center mt-3 pt-2 border-top border-secondary">
+                                <span th:if="${#aggregates.sum(movimientos.![debe]) == #aggregates.sum(movimientos.![haber])}"
+                                      class="badge bg-success w-100">
+                                    <i class="bi bi-patch-check-fill me-1"></i> PÁGINA CUADRADA
+                                </span>
+                                <span th:unless="${#aggregates.sum(movimientos.![debe]) == #aggregates.sum(movimientos.![haber])}"
+                                      class="badge bg-danger w-100">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i> AVISO: DESCUADRE EN ESTA PÁGINA
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<style>
+    .nuevo-asiento { border-top: 2px solid #dee2e6 !important; background-color: rgba(0,0,0,0.02); }
+    .mismo-asiento { color: transparent !important; border-top: none !important; }
+    #tablaDiario tbody tr:hover td { color: #000 !important; background-color: #f1f8ff; }
+    .table td { vertical-align: middle; padding: 0.5rem; }
+    .breadcrumb-item + .breadcrumb-item::before { content: "»"; }
+    .pagination .page-link { border: none; color: #333; margin: 0 2px; border-radius: 4px !important; }
+    .pagination .page-item.active .page-link { background-color: #198754; color: white; }
+    @media print {
+        .sidebar, .btn-group, .d-flex.gap-2, .breadcrumb, .card.mb-3, nav, .alert { display: none !important; }
+        .col-md-9 { width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important; }
+        .card { border: 1px solid #000 !important; }
+        .bg-dark { background-color: #000 !important; color: #fff !important; }
+        .table { font-size: 10px; }
+    }
+</style>
+
+<script th:fragment="scripts">
+    document.querySelectorAll('#tablaDiario tr').forEach(row => {
+        row.addEventListener('mouseover', () => {
+            const asiento = row.cells[0].innerText;
+        });
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

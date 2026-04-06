@@ -1,34 +1,251 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head>
+<head th:replace="~{layout :: head}">
     <title>Mis Comunidades - SEPA 1914</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 </head>
-<body class="container mt-5">
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Panel de Gestión de Fincas</h2>
-    <a th:href="@{/comunidades/nueva}" class="btn btn-primary">+ Nueva Comunidad</a>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="bi bi-building text-primary"></i> Gestión de Comunidades</h1>
+                <div class="btn-toolbar mb-2 mb-md-0 gap-2">
+                    <a th:href="@{/comunidades/informe-global-pdf}" class="btn btn-sm btn-outline-danger shadow-sm" title="Descargar relación de todas las fincas">
+                        <i class="bi bi-file-earmark-pdf-fill"></i> Informe General
+                    </a>
+                    <a th:href="@{/comunidades/nueva}" class="btn btn-sm btn-primary shadow-sm">
+                        <i class="bi bi-plus-circle"></i> Nueva Comunidad
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${param.exito}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i> Comunidad guardada correctamente.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+            <div th:if="${param.editado}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-pencil-square me-2"></i> Datos actualizados correctamente.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+            <div th:if="${seleccionExito}" class="alert alert-info alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-info-circle-fill me-2"></i> <span th:text="${seleccionExito}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+            <div th:if="${param.error}" class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>Atención:</strong> <span th:text="${param.error}">Error en la operación</span>.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="card shadow-sm mt-3 border-0">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-dark">
+                            <tr>
+                                <th class="ps-4" style="width: 25%;">Finca / Identificador</th>
+                                <th style="width: 20%;">Datos Bancarios</th>
+                                <th style="width: 15%;">Ubicación</th>
+                                <th class="text-center" style="width: 40%;">Operativa y Contabilidad</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="comunidad : ${comunidades}" th:classappend="${session.comunidadSeleccionada != null and session.comunidadSeleccionada.id == comunidad.id ? 'table-primary' : ''}">
+                                <td class="ps-4 align-top">
+                                    <a th:href="@{/comunidades/detalle/{id}(id=${comunidad.id})}" class="text-decoration-none group">
+                                        <div class="fw-bold text-dark h6 mb-0">
+                                            <span class="badge bg-secondary me-1" th:text="${comunidad.id}">0</span>
+                                            <span th:text="${comunidad.nombre}">Nombre</span>
+                                        </div>
+                                    </a>
+                                </td>
+                                <td>
+                                    <div class="small mb-1"><span class="text-muted">Acreedor:</span> <code class="text-primary fw-bold" th:text="${comunidad.identificadorAcreedor}">ESXX</code></div>
+                                    <div class="small font-monospace text-secondary" style="font-size: 0.8rem;" th:text="${comunidad.iban}">IBAN</div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border" th:text="${comunidad.poblacion}">Población</span>
+                                </td>
+                                <td class="text-center">
+                                    <a th:href="@{/comunidades/seleccionar/{id}(id=${comunidad.id})}" class="btn btn-sm btn-primary shadow-sm me-2">
+                                        <i class="bi bi-power"></i> Activar
+                                    </a>
+
+                                    <div class="btn-group btn-group-sm me-2 shadow-sm" role="group">
+                                        <a th:href="@{/contabilidad/recibos/{id}(id=${comunidad.id})}"
+                                           class="btn btn-success" title="Conciliar Ingresos (Recibos Bancarios)">
+                                            <i class="bi bi-bank"></i>
+                                        </a>
+                                        <a th:href="@{/contabilidad/gastos/{id}(id=${comunidad.id})}"
+                                           class="btn btn-warning" title="Gestionar Gastos y Facturas">
+                                            <i class="bi bi-receipt"></i>
+                                        </a>
+                                        <a th:href="@{/contabilidad/liquidacion/{id}(id=${comunidad.id})}"
+                                           class="btn btn-primary" title="Estado de Liquidación y Desviaciones">
+                                            <i class="bi bi-graph-up-arrow"></i>
+                                        </a>
+                                    </div>
+
+                                    <div class="btn-group btn-group-sm me-2 shadow-sm" role="group">
+                                        <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}"
+                                           class="btn btn-info text-white" title="Listado de Vecinos">
+                                            <i class="bi bi-people"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-dark"
+                                                data-bs-toggle="modal" th:data-bs-target="'#modalFecha' + ${comunidad.id}"
+                                                title="Generar Cuaderno Bancario .C19">
+                                            <i class="bi bi-file-earmark-binary"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-primary"
+                                                data-bs-toggle="modal" th:data-bs-target="'#modalConvocatoria' + ${comunidad.id}"
+                                                title="Preparar Convocatoria de Junta">
+                                            <i class="bi bi-megaphone"></i>
+                                        </button>
+                                    </div>
+
+                                    <div class="btn-group btn-group-sm shadow-sm" role="group">
+                                        <a th:href="@{/comunidades/descargar-pdf-resumen/{id}(id=${comunidad.id})}"
+                                           class="btn btn-outline-danger" title="PDF Resumen de Conceptos">
+                                            <i class="bi bi-file-earmark-pdf"></i>
+                                        </a>
+                                        <a th:href="@{/comunidades/editar/{id}(id=${comunidad.id})}"
+                                           class="btn btn-outline-secondary" title="Configuración de la Finca">
+                                            <i class="bi bi-gear"></i>
+                                        </a>
+                                    </div>
+
+                                    <div class="modal fade" th:id="'modalFecha' + ${comunidad.id}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content border-0 shadow">
+                                                <form th:action="@{/bancos/descargar-remesa/{id}(id=${comunidad.id})}" method="get">
+                                                    <div class="modal-header bg-dark text-white">
+                                                        <h5 class="modal-title"><i class="bi bi-calendar-check me-2"></i>Remesa Bancaria</h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body text-start p-4">
+                                                        <div class="alert alert-info small py-2 mb-3">
+                                                            <i class="bi bi-info-circle"></i> Se generará el fichero SEPA y se registrarán los recibos como PENDIENTES.
+                                                        </div>
+                                                        <p>Comunidad: <strong class="text-primary" th:text="${comunidad.nombre}">Nombre</strong></p>
+                                                        <div class="mb-0">
+                                                            <label class="form-label fw-bold">Fecha de Cargo:</label>
+                                                            <input type="date" name="fecha" class="form-control form-control-lg"
+                                                                   th:value="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}" required>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer bg-light">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                        <button type="submit" class="btn btn-primary px-4" th:onclick="'cerrarModal(' + ${comunidad.id} + ')'">Procesar .C19</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="modal fade" th:id="'modalConvocatoria' + ${comunidad.id}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content border-0 shadow">
+                                                <form th:action="@{/informes/convocatoria/{id}(id=${comunidad.id})}" method="get" target="_blank">
+                                                    <div class="modal-header bg-primary text-white">
+                                                        <h5 class="modal-title"><i class="bi bi-megaphone me-2"></i>Preparar Convocatoria</h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body text-start p-4">
+                                                        <p class="small text-muted mb-3">Configure los datos de la reunión para generar las cartas personalizadas.</p>
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold">Fecha de la Junta:</label>
+                                                            <input type="text" name="fechaJunta" class="form-control" placeholder="Ej: 15 de Abril de 2026" required>
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold">Lugar de la Reunión:</label>
+                                                            <input type="text" name="lugar" class="form-control" placeholder="Ej: Portales de la comunidad" required>
+                                                        </div>
+
+                                                        <div class="row mb-3">
+                                                            <div class="col">
+                                                                <label class="form-label fw-bold small">1ª Convocatoria</label>
+                                                                <input type="time" name="hora1" class="form-control" value="19:00">
+                                                            </div>
+                                                            <div class="col">
+                                                                <label class="form-label fw-bold small">2ª Convocatoria</label>
+                                                                <input type="time" name="hora2" class="form-control" value="19:30">
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="mb-0">
+                                                            <label class="form-label fw-bold">Orden del Día (un punto por línea):</label>
+                                                            <textarea name="puntosArea" class="form-control" rows="4"
+                                                                      placeholder="1. Lectura del acta anterior&#10;2. Aprobación de cuentas..."></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer bg-light">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                                        <button type="submit" class="btn btn-primary px-4">
+                                                            <i class="bi bi-file-pdf me-2"></i>Generar PDF Masivo
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(comunidades)}">
+                                <td colspan="4" class="text-center py-5 text-muted">
+                                    <i class="bi bi-building-exclamation display-4 d-block mb-3 opacity-25"></i>
+                                    No hay comunidades registradas todavía.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 p-3 bg-white rounded border shadow-sm small">
+                <div class="row align-items-center text-center text-md-start">
+                    <div class="col-md-7 border-md-end">
+                        <span class="text-secondary text-uppercase fw-bold" style="font-size: 0.65rem;">Módulo de Contabilidad Profesional</span><br>
+                        <span class="me-3"><i class="bi bi-bank text-success"></i> Ingresos</span>
+                        <span class="me-3"><i class="bi bi-receipt text-warning"></i> Facturas</span>
+                        <span class="me-3"><i class="bi bi-graph-up-arrow text-primary"></i> Liquidación Anual</span>
+                        <span class="me-3"><i class="bi bi-people text-info"></i> Propietarios</span>
+                    </div>
+                    <div class="col-md-5 ps-md-4 mt-2 mt-md-0">
+                        <span class="text-secondary text-uppercase fw-bold" style="font-size: 0.65rem;">Herramientas SEPA</span><br>
+                        <span class="me-3"><i class="bi bi-file-earmark-binary text-dark"></i> Cuaderno .C19</span>
+                        <span class="me-3"><i class="bi bi-file-earmark-pdf text-danger"></i> Reporte PDF</span>
+                        <span class="me-3"><i class="bi bi-megaphone text-primary"></i> Convocatoria</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
 </div>
 
-<table class="table table-striped shadow-sm">
-    <thead class="table-dark">
-    <tr>
-        <th>Nombre (AT-03)</th>
-        <th>ID Acreedor (AT-02)</th>
-        <th>IBAN de Cobro (AT-04)</th>
-        <th>Acciones</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr th:each="c : ${comunidades}">
-        <td th:text="${c.nombre}">Nombre</td>
-        <td th:text="${c.identificadorAcreedor}">ES00000...</td>
-        <td th:text="${c.iban}">IBAN</td>
-        <td>
-            <a th:href="@{/vecinos/lista(comunidadId=${c.id})}" class="btn btn-sm btn-info text-white">Ver Vecinos</a>
-        </td>
-    </tr>
-    </tbody>
-</table>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script th:inline="javascript">
+    /**
+     * Cierra el modal automáticamente tras iniciar la descarga.
+     */
+    function cerrarModal(id) {
+        const modalElement = document.getElementById('modalFecha' + id);
+        if (modalElement) {
+            setTimeout(() => {
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) modalInstance.hide();
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) backdrop.remove();
+                document.body.style.overflow = 'auto';
+            }, 1200);
+        }
+    }
+</script>
 </body>
 </html>

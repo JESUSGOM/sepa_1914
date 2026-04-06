@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title th:text="${gasto.id != null ? 'Editar Gasto' : 'Nuevo Gasto'} + ' - SEPA 1914'"></title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+            <nav aria-label="breadcrumb" class="mb-3">
+                <ol class="breadcrumb small">
+                    <li class="breadcrumb-item"><a th:href="@{/contabilidad/gastos/{id}(id=${comunidad.id})}">Listado de Gastos</a></li>
+                    <li class="breadcrumb-item active" th:text="${gasto.id != null ? 'Edición' : 'Alta de Factura'}">Alta</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-4">
+                <h1 class="h2 mb-0 text-dark" th:text="${gasto.id != null ? 'Editar Factura / Gasto' : 'Registrar Factura / Gasto'}">Registrar Factura / Gasto</h1>
+                <span class="badge bg-info text-dark p-2 shadow-sm" th:text="${comunidad.nombre}">Comunidad</span>
+            </div>
+
+            <div class="alert alert-primary border-0 shadow-sm d-flex align-items-center mb-4" role="alert">
+                <i class="bi bi-info-circle-fill fs-4 me-3"></i>
+                <div>
+                    <strong>Información Contable:</strong> Al guardar esta factura, el sistema generará automáticamente un asiento de devengo en el Libro Diario (Grupo 6) para el estado de liquidación anual.
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="mb-0 fw-bold text-secondary text-uppercase" style="font-size: 0.75rem; letter-spacing: 1px;">Datos de la Factura Recibida</h6>
+                </div>
+                <div class="card-body p-4">
+                    <form th:action="@{/contabilidad/gastos/guardar}" th:object="${gasto}" method="post" class="row g-4 needs-validation" novalidate>
+
+                        <input type="hidden" th:field="*{id}">
+                        <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+                        <input type="hidden" th:field="*{pagado}">
+                        <input type="hidden" th:field="*{fechaPago}">
+                        <input type="hidden" th:field="*{numeroAsiento}">
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Fecha Factura</label>
+                            <input type="date" th:field="*{fecha}" class="form-control shadow-sm border-2" required>
+                            <div class="invalid-feedback">Seleccione la fecha de emisión.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Nº Factura / Documento</label>
+                            <input type="text" th:field="*{numeroFactura}" class="form-control shadow-sm" placeholder="Ej: 2026-ABC-01" required>
+                            <div class="invalid-feedback">Indique el número de factura.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Importe Total (con IVA)</label>
+                            <div class="input-group shadow-sm">
+                                <input type="number" step="0.01" th:field="*{importeTotal}" class="form-control fw-bold border-2" placeholder="0.00" required>
+                                <span class="input-group-text bg-light fw-bold">€</span>
+                                <div class="invalid-feedback">El importe debe ser válido.</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase">Proveedor / Acreedor</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0"><i class="bi bi-person-badge"></i></span>
+                                <input type="text" th:field="*{proveedor}" class="form-control shadow-sm border-start-0" placeholder="Ej: Compañía Eléctrica S.A." required>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase text-primary">
+                                <i class="bi bi-diagram-3-fill me-1"></i> Cuenta de Gasto (Clasificación)
+                            </label>
+                            <select name="cuentaGastoId" class="form-select border-primary border-2 shadow-sm" required>
+                                <option value="">-- Seleccione el concepto contable --</option>
+                                <option th:each="cta : ${cuentasGasto}"
+                                        th:value="${cta.id}"
+                                        th:text="${cta.codigo + ' - ' + cta.nombre}"
+                                        th:selected="${gasto.cuentaGasto != null && gasto.cuentaGasto.id == cta.id}">
+                                </option>
+                            </select>
+                            <div class="invalid-feedback">Debe clasificar el gasto en una cuenta contable.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-uppercase">Concepto Detallado</label>
+                            <textarea th:field="*{concepto}" class="form-control shadow-sm" rows="3"
+                                      placeholder="Este texto aparecerá en el informe de gastos de los vecinos..." required></textarea>
+                            <div class="invalid-feedback">Describa brevemente el gasto para la liquidación.</div>
+                        </div>
+
+                        <div class="col-12 mt-5 d-flex gap-3 border-top pt-4">
+                            <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm">
+                                <i class="bi bi-save2 me-2"></i>
+                                <span th:text="${gasto.id != null ? 'Actualizar Factura' : 'Guardar y Contabilizar'}">Guardar</span>
+                            </button>
+
+                            <a th:href="@{/contabilidad/gastos/{id}(id=${comunidad.id})}" class="btn btn-light border px-4 btn-lg">
+                                <i class="bi bi-x-circle me-2"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="mt-4 text-center">
+                <p class="text-muted" style="font-size: 0.75rem;">
+                    <i class="bi bi-shield-lock-fill"></i> Sistema de Contabilidad SEPA 1914 | Registro Seguro de Facturas Grupo 6
+                </p>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Validación de formularios de Bootstrap original
+    (function () {
+        'use strict'
+        var forms = document.querySelectorAll('.needs-validation')
+        Array.prototype.slice.call(forms).forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        })
+    })()
+</script>
+
+<style>
+    .form-label { margin-bottom: 0.35rem; font-size: 0.75rem; letter-spacing: 0.02rem; }
+    .card-header { border-bottom: 1px solid #edf2f9; }
+    .breadcrumb-item + .breadcrumb-item::before { content: "›"; }
+    .form-control:focus, .form-select:focus { border-color: #0d6efd; box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15); }
+</style>
+</body>
+</html>

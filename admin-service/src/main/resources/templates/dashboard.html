@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Panel de Control - SEPA 1914</title>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Panel de Control</h1>
+                <div class="text-muted small">
+                    Administrador: <span class="fw-bold text-dark" th:text="${#authentication.name}">Usuario</span>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-3">
+                    <div class="card text-white bg-primary mb-3 shadow border-0">
+                        <div class="card-body">
+                            <h5 class="card-title opacity-75">Comunidades</h5>
+                            <p class="card-text h2" th:text="${totalComunidades}">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card text-white bg-success mb-3 shadow border-0">
+                        <div class="card-body">
+                            <h5 class="card-title opacity-75">Propietarios Totales</h5>
+                            <p class="card-text h2" th:text="${totalVecinos}">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card text-white bg-info mb-3 shadow border-0">
+                        <div class="card-body">
+                            <h5 class="card-title opacity-75">Conceptos Activos</h5>
+                            <p class="card-text h2" th:text="${totalConceptos}">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <a th:href="@{/comunidades/historial-remesas}" class="text-decoration-none">
+                        <div class="card text-white bg-warning mb-3 shadow border-0" style="cursor: pointer;">
+                            <div class="card-body">
+                                <h5 class="card-title opacity-75">Remesas Generadas</h5>
+                                <p class="card-text h2" th:text="${totalRemesas}">0</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="mt-5 text-center opacity-75">
+                <img th:src="@{/images/logo.jpg}" alt="SEPA 1914" width="150" class="rounded-circle shadow-sm mb-3">
+                <h3>Sistema de Gestión Integral de Fincas</h3>
+                <p>Bienvenido al panel de administración de comunidades SEPA 1914.</p>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{layout :: scripts}"></div>
+</body>
+</html>

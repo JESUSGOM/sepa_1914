@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Conciliación Bancaria (Norma 43) - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Conciliación Bancaria</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">
+                    <i class="bi bi-bank2 text-primary"></i>
+                    Conciliación: <span class="text-muted" th:text="${comunidad.nombre}">Nombre Comunidad</span>
+                </h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <span class="badge bg-dark p-2" th:text="${comunidad.iban}">ES00...</span>
+                </div>
+            </div>
+
+            <div th:if="${mensaje}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <span th:text="${mensaje}">Mensaje de éxito</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div th:if="${error}" class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <span th:text="${error}">Error</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-primary text-white fw-bold py-3">
+                    <i class="bi bi-file-earmark-arrow-up me-2"></i> Importar Fichero Norma 43 (.n43, .txt, .dat)
+                </div>
+                <div class="card-body bg-white p-4">
+                    <form th:action="@{/bancos/procesar}" method="post" enctype="multipart/form-data" class="row g-3">
+                        <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Seleccione el archivo descargado de su banco</label>
+                            <input type="file" name="fichero" class="form-control form-control-lg" accept=".n43,.txt,.dat" required>
+                            <div class="form-text mt-2">
+                                <i class="bi bi-info-circle"></i> Este proceso leerá los movimientos, pero no alterará la contabilidad hasta que usted lo confirme.
+                            </div>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary btn-lg w-100 shadow-sm">
+                                <i class="bi bi-gear-wide-connected"></i> Analizar Movimientos
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0" th:if="${movimientos != null and !movimientos.isEmpty()}">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+                    <span class="fw-bold"><i class="bi bi-list-check me-2"></i> Movimientos detectados en el extracto</span>
+                    <span class="badge bg-light text-dark" th:text="${movimientos.size() + ' apuntes encontrados'}"></span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive p-4">
+                        <table class="table table-hover align-middle mb-0" id="tablaImportacion">
+                            <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Fecha Op.</th>
+                                <th>Fecha Valor</th>
+                                <th>Concepto Detallado</th>
+                                <th>Referencia</th>
+                                <th class="text-end pe-4">Importe (€)</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="m : ${movimientos}">
+                                <td class="ps-4">
+                                    <span class="fw-bold" th:text="${#temporals.format(m.fechaOperacion, 'dd/MM/yyyy')}">01/01/2024</span>
+                                </td>
+                                <td>
+                                    <small class="text-muted" th:text="${#temporals.format(m.fechaValor, 'dd/MM/yyyy')}">01/01/2024</small>
+                                </td>
+                                <td>
+                                    <div class="small text-wrap" style="max-width: 400px;" th:text="${m.concepto}">CONCEPTO</div>
+                                </td>
+                                <td><code class="small text-secondary" th:text="${m.documentoExtra}">REF</code></td>
+                                <td class="text-end pe-4">
+                                    <span th:class="${m.signo == '2' ? 'text-success fw-bold' : 'text-danger fw-bold'}">
+                                        <span th:text="${m.signo == '1' ? '-' : '+'}"></span>
+                                        <span th:text="${#numbers.formatDecimal(m.importe, 1, 2, 'COMMA')}">0,00</span> €
+                                    </span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white text-end py-3">
+                    <form th:action="@{/bancos/confirmar-guardado}" method="post">
+                        <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+                        <a th:href="@{/bancos/importar/{id}(id=${comunidad.id})}" class="btn btn-outline-secondary me-2"><i class="bi bi-trash"></i> Descartar</a>
+                        <button type="submit" class="btn btn-success px-4 shadow-sm"><i class="bi bi-save2"></i> Confirmar y Guardar</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="text-center py-5" th:if="${movimientos == null}">
+                <i class="bi bi-cloud-upload display-1 text-light"></i>
+                <p class="text-muted mt-3">Suba un archivo Norma 43 para empezar.</p>
+            </div>
+        </main>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+<script th:inline="none">
+    $(document).ready(function() {
+        $('#tablaImportacion').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" },
+            "order": [[0, 'desc']],
+            "pageLength": 10
+        });
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

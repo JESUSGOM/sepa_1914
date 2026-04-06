@@ -1,48 +1,173 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <title>Nuevo Vecino - SEPA 1914</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<head th:replace="~{layout :: head}">
+    <title>Ficha de Propiedad - SEPA 1914</title>
 </head>
 <body class="bg-light">
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-header bg-success text-white">
-                    <h4 class="mb-0">Nuevo Propietario / Deudor</h4>
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb small">
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
+                    <li class="breadcrumb-item"><a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}" th:text="${comunidad.nombre}">Comunidad</a></li>
+                    <li class="breadcrumb-item active">Ficha de Propiedad</li>
+                </ol>
+            </nav>
+
+            <form th:action="@{/vecinos/guardar(comunidadId=${comunidad.id})}" th:object="${vecino}" method="post">
+                <input type="hidden" th:field="*{id}" />
+
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <div class="card shadow-sm border-0 mb-4">
+                            <div class="card-header bg-white py-3">
+                                <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i>Titularidad y Ubicación</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label small fw-bold">Nombre / Razón Social</label>
+                                        <input type="text" th:field="*{nombre}" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold">NIF / CIF</label>
+                                        <input type="text" th:field="*{nif}" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold">Referencia Vivienda</label>
+                                        <input type="text" th:field="*{vivienda}" class="form-control" required placeholder="Ej: 1º A">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold">Piso / Portón</label>
+                                        <input type="text" th:field="*{pisoPorton}" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card shadow-sm border-0 mb-4">
+                            <div class="card-header bg-white py-3">
+                                <h6 class="mb-0 fw-bold"><i class="bi bi-telephone me-2"></i>Contacto</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold">Teléfono 1</label>
+                                        <input type="text" th:field="*{telefono_1}" class="form-control">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold">Teléfono 2</label>
+                                        <input type="text" th:field="*{telefono_2}" class="form-control">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold">Teléfono 3</label>
+                                        <input type="text" th:field="*{telefono_3}" class="form-control">
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label small fw-bold">Email</label>
+                                        <input type="email" th:field="*{email}" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-5">
+                        <div class="card shadow-sm border-0 border-start border-4 border-primary mb-4">
+                            <div class="card-header bg-white py-3">
+                                <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-calculator me-2"></i>Calculador de Coeficientes</h6>
+                            </div>
+                            <div class="card-body bg-light-subtle">
+                                <p class="small text-muted mb-3">Introduzca los coeficientes de la escritura para sumarlos automáticamente:</p>
+
+                                <div class="row g-2 mb-3">
+                                    <div class="col-4">
+                                        <label class="small fw-bold">Vivienda %</label>
+                                        <input type="number" step="0.0001" id="c_viv" class="form-control form-control-sm calc-input" value="0.0000">
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="small fw-bold">Garaje %</label>
+                                        <input type="number" step="0.0001" id="c_gar" class="form-control form-control-sm calc-input" value="0.0000">
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="small fw-bold">Trastero %</label>
+                                        <input type="number" step="0.0001" id="c_tra" class="form-control form-control-sm calc-input" value="0.0000">
+                                    </div>
+                                </div>
+
+                                <label class="form-label small fw-bold text-dark">COEFICIENTE TOTAL CONSOLIDADO</label>
+                                <div class="input-group">
+                                    <input type="number" step="0.0001" th:field="*{coeficiente}" id="coeficienteReal"
+                                           class="form-control form-control-lg fw-bold text-primary bg-white" readonly>
+                                    <span class="input-group-text bg-primary text-white">%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card shadow-sm border-0 mb-4">
+                            <div class="card-header bg-white py-3">
+                                <h6 class="mb-0 fw-bold"><i class="bi bi-bank me-2"></i>Datos Bancarios</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" th:field="*{domiciliado}" id="chkDom">
+                                    <label class="form-check-label fw-bold" for="chkDom">Recibo Domiciliado</label>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">IBAN</label>
+                                    <input type="text" th:field="*{iban}" class="form-control font-monospace">
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" th:field="*{activo}" id="chkAct">
+                                    <label class="form-check-label" for="chkAct">Propietario Activo</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 py-3 fw-bold shadow">
+                            <i class="bi bi-save2 me-2"></i> GUARDAR PROPIEDAD
+                        </button>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <form th:action="@{/vecinos/guardar(comunidadId=${comunidad.id})}" th:object="${vecino}" method="post">
-
-                        <div class="mb-3">
-                            <label class="form-label font-weight-bold">Nombre Completo</label>
-                            <input type="text" th:field="*{nombre}" class="form-control" placeholder="Ej: Juan Pérez García" required>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label font-weight-bold">Referencia Mandato (AT-01)</label>
-                            <input type="text" th:field="*{referenciaMandato}" class="form-control"
-                                   placeholder="Ej: DNI o Código Único" maxlength="35" required>
-                            <small class="text-muted">ID único de la firma de autorización (máx. 35 caracteres).</small>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label font-weight-bold">IBAN del Vecino (AT-07)</label>
-                            <input type="text" th:field="*{iban}" class="form-control"
-                                   placeholder="ESXX 0000 0000 0000 0000 0000" maxlength="34" required>
-                            <small class="text-muted">Cuenta donde se cargará el recibo.</small>
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                            <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}" class="btn btn-secondary me-md-2">Cancelar</a>
-                            <button type="submit" class="btn btn-success">Guardar Vecino</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+            </form>
+        </main>
     </div>
 </div>
+
+<script>
+    const inputs = document.querySelectorAll('.calc-input');
+    const totalField = document.getElementById('coeficienteReal');
+
+    // Al cargar la página, si el total > 0 y los desgloses están a 0,
+    // ponemos el total en "vivienda" para facilitar la edición de vecinos viejos.
+    window.addEventListener('load', () => {
+        const currentTotal = parseFloat(totalField.value || 0);
+        const v = parseFloat(document.getElementById('c_viv').value || 0);
+        const g = parseFloat(document.getElementById('c_gar').value || 0);
+        const t = parseFloat(document.getElementById('c_tra').value || 0);
+
+        if (currentTotal > 0 && v === 0 && g === 0 && t === 0) {
+            document.getElementById('c_viv').value = currentTotal.toFixed(4);
+        }
+    });
+
+    // Lógica de suma automática
+    inputs.forEach(input => {
+        input.addEventListener('input', () => {
+            let suma = 0;
+            inputs.forEach(i => suma += parseFloat(i.value || 0));
+            totalField.value = suma.toFixed(4);
+        });
+    });
+</script>
+
+<style>
+    .bg-light-subtle { background-color: #f0f7ff; }
+    .font-monospace { font-family: 'Courier New', monospace; }
+</style>
 </body>
 </html>

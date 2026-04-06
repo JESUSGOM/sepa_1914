@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Conceptos de Cobro - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb small">
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/vecinos/lista(comunidadId=${vecino.comunidad.id})}" th:text="'Vecinos de ' + ${vecino.comunidad.nombre}">Vecinos</a>
+                    </li>
+                    <li class="breadcrumb-item active">Conceptos</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-4 border-bottom">
+                <h1 class="h3 mb-0">
+                    <i class="bi bi-person-badge text-primary me-2"></i>
+                    <span th:text="${vecino.nombre}">Nombre del Vecino</span>
+                    <span class="badge bg-success ms-2 shadow-sm" style="font-size: 0.9rem;">
+                        <span th:text="${#numbers.formatDecimal(vecino.getImporteTotalConceptos(), 1, 2, 'COMMA')}">0,00</span> €/mes
+                    </span>
+                </h1>
+                <div class="text-end">
+                    <span class="badge bg-secondary px-3 py-2" th:text="${vecino.comunidad.nombre}">Finca</span>
+                    <span class="badge bg-dark px-3 py-2" th:text="${vecino.pisoPorton}">1º A</span>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4 border-0 border-start border-primary border-4">
+                <div class="card-header bg-white fw-bold py-3">
+                    <i class="bi bi-magic text-primary me-2"></i> Asignación Rápida desde Maestro
+                </div>
+                <div class="card-body bg-light-subtle">
+                    <div class="row g-3">
+                        <div class="col-md-10">
+                            <select id="selectMaestro" class="form-select border-primary-subtle">
+                                <option value="">-- Seleccione una plantilla del catálogo global --</option>
+                                <option th:each="m : ${conceptosMaestros}"
+                                        th:value="${m.id}"
+                                        th:data-desc="${m.descripcion}"
+                                        th:data-period="${m.periodicidad}"
+                                        th:data-importe="${m.importe}"
+                                        th:text="${m.descripcion} + ' (Sugerido: ' + ${#numbers.formatDecimal(m.importe, 1, 2, 'COMMA')} + '€)'">
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-primary w-100 shadow-sm" onclick="cargarDesdeMaestro()">
+                                <i class="bi bi-box-arrow-in-down me-1"></i> Cargar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4 border-0">
+                <div class="card-header bg-white fw-bold py-3">
+                    <i class="bi bi-plus-circle-fill text-success me-2"></i> Configurar Concepto de Cobro
+                </div>
+                <div class="card-body">
+                    <form th:action="@{/conceptos/guardar}" method="post" class="row g-3">
+                        <input type="hidden" name="vecinoId" th:value="${vecino.id}">
+
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted text-uppercase">Descripción</label>
+                            <input type="text" id="descInput" name="descripcion" class="form-control" placeholder="Ej: Cuota Comunidad" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-bold text-muted text-uppercase">Importe (€)</label>
+                            <div class="input-group">
+                                <input type="number" id="importeInput" step="0.01" name="importe" class="form-control" placeholder="0.00" required>
+                                <span class="input-group-text">€</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted text-uppercase">Periodicidad</label>
+                            <select id="periodSelect" name="periodicidad" class="form-select" onchange="toggleMesInicio()">
+                                <option value="MENSUAL">Mensual</option>
+                                <option value="BIMESTRAL">Bimestral (Módulo 2)</option>
+                                <option value="TRIMESTRAL">Trimestral (Módulo 3)</option>
+                                <option value="CUATRIMESTRAL">Cuatrimestral (Módulo 4)</option>
+                                <option value="SEMESTRAL">Semestral (Módulo 6)</option>
+                                <option value="ANUAL">Anual (1 vez al año)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2" id="divMesInicio" style="display: none;">
+                            <label class="form-label small fw-bold text-muted text-uppercase">Mes de Aplicación</label>
+                            <select name="mesInicio" class="form-select bg-warning-subtle border-warning-subtle">
+                                <option value="1">Enero</option><option value="2">Febrero</option>
+                                <option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option>
+                                <option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option>
+                                <option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-success w-100 shadow-sm">
+                                <i class="bi bi-check-lg me-1"></i> Asignar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white fw-bold py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Conceptos Recurrentes</span>
+                        <small class="fw-normal opacity-75">Configuración de remesas automáticas</small>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                            <tr class="small text-uppercase text-muted">
+                                <th class="ps-4">Descripción</th>
+                                <th>Importe</th>
+                                <th>Periodicidad / Inicio</th>
+                                <th>Estado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="c : ${conceptos}" th:class="${!c.activo ? 'table-light text-muted' : ''}">
+                                <td class="ps-4">
+                                    <div th:text="${c.descripcion}" th:classappend="${!c.activo ? 'text-decoration-line-through' : 'fw-bold'}"></div>
+                                </td>
+                                <td>
+                                    <span class="fw-bold fs-5" th:classappend="${c.activo ? 'text-primary' : ''}"
+                                          th:text="${#numbers.formatDecimal(c.importe, 1, 2, 'COMMA')} + ' €'">0,00 €</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1" th:text="${c.periodicidad}">MENSUAL</span>
+                                    <span th:if="${c.periodicidad.name() != 'MENSUAL'}" class="ms-1 small text-muted">
+                                        (Desde Mes <span th:text="${c.mesInicio}">1</span>)
+                                    </span>
+                                </td>
+                                <td>
+                                    <span th:if="${c.activo}" class="badge bg-success-subtle text-success border border-success-subtle">ACTIVO</span>
+                                    <span th:unless="${c.activo}" class="badge bg-warning-subtle text-warning border border-warning-subtle">PAUSADO</span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group shadow-sm">
+                                        <button type="button" class="btn btn-sm btn-white border"
+                                                data-bs-toggle="modal"
+                                                th:data-bs-target="'#modalEdit' + ${c.id}">
+                                            <i class="bi bi-pencil text-primary"></i>
+                                        </button>
+
+                                        <form th:action="@{/conceptos/toggle-estado/{id}(id=${c.id})}" method="post" class="d-inline">
+                                            <input type="hidden" name="vecinoId" th:value="${vecino.id}">
+                                            <button type="submit" class="btn btn-sm border"
+                                                    th:classappend="${c.activo ? 'btn-white' : 'btn-success text-white'}"
+                                                    th:title="${c.activo ? 'Pausar' : 'Activar'}">
+                                                <i class="bi" th:classappend="${c.activo ? 'bi-pause-circle text-warning' : 'bi-play-circle'}"></i>
+                                            </button>
+                                        </form>
+
+                                        <form th:action="@{/conceptos/eliminar/{id}(id=${c.id})}" method="post" class="d-inline"
+                                              onsubmit="return confirm('¿Eliminar definitivamente este concepto?')">
+                                            <input type="hidden" name="vecinoId" th:value="${vecino.id}">
+                                            <button type="submit" class="btn btn-sm btn-white border">
+                                                <i class="bi bi-trash text-danger"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <div class="modal fade" th:id="'modalEdit' + ${c.id}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered modal-sm">
+                                            <div class="modal-content border-0 shadow-lg">
+                                                <form th:action="@{/conceptos/editar-importe/{id}(id=${c.id})}" method="post">
+                                                    <input type="hidden" name="vecinoId" th:value="${vecino.id}">
+                                                    <div class="modal-header bg-primary text-white py-2">
+                                                        <h6 class="modal-title">Actualizar Importe</h6>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body text-start p-4">
+                                                        <label class="form-label small fw-bold text-uppercase" th:text="${c.descripcion}">Concepto</label>
+                                                        <div class="input-group">
+                                                            <input type="number" step="0.01" name="nuevoImporte"
+                                                                   class="form-control form-control-lg text-center fw-bold"
+                                                                   th:value="${c.importe}" required autofocus>
+                                                            <span class="input-group-text">€</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-0 pt-0">
+                                                        <button type="submit" class="btn btn-primary w-100 shadow-sm">Guardar Cambios</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <a th:href="@{/vecinos/lista(comunidadId=${vecino.comunidad.id})}" class="btn btn-outline-secondary btn-sm px-3 shadow-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Volver a la Lista de Vecinos
+                </a>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    /**
+     * Muestra u oculta el selector de Mes de Inicio según la periodicidad elegida.
+     */
+    function toggleMesInicio() {
+        const period = document.getElementById('periodSelect').value;
+        const div = document.getElementById('divMesInicio');
+        // Si es MENSUAL, no tiene sentido elegir mes de inicio (se cobra siempre).
+        div.style.display = (period === 'MENSUAL') ? 'none' : 'block';
+    }
+
+    /**
+     * Carga los datos desde el Maestro de Conceptos Globales.
+     */
+    function cargarDesdeMaestro() {
+        const select = document.getElementById('selectMaestro');
+        const selectedOption = select.options[select.selectedIndex];
+
+        if (selectedOption.value !== "") {
+            document.getElementById('descInput').value = selectedOption.getAttribute('data-desc');
+            document.getElementById('importeInput').value = selectedOption.getAttribute('data-importe');
+            document.getElementById('periodSelect').value = selectedOption.getAttribute('data-period');
+
+            // Ejecutamos el toggle para mostrar el mes si la plantilla no es mensual
+            toggleMesInicio();
+
+            // Feedback visual de carga exitosa
+            const target = document.getElementById('descInput');
+            target.classList.add('is-valid');
+            setTimeout(() => { target.classList.remove('is-valid'); }, 1000);
+        }
+    }
+
+    // Inicialización al cargar la página
+    document.addEventListener("DOMContentLoaded", function() {
+        toggleMesInicio();
+    });
+</script>
+
+<style>
+    .btn-white { background-color: #fff; color: #212529; }
+    .btn-white:hover { background-color: #f8f9fa; }
+    .bg-info-subtle { background-color: #e1f5fe !important; }
+    .text-info { color: #0288d1 !important; }
+    .border-info-subtle { border-color: #b3e5fc !important; }
+    .table th { font-size: 0.75rem; letter-spacing: 0.05rem; }
+    .breadcrumb-item a { text-decoration: none; }
+</style>
+</body>
+</html>

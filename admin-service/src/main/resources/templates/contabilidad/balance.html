@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Balance de Situación - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                <h2 class="h4"><i class="bi bi-calculator-fill me-2 text-primary"></i>Balance de Situación</h2>
+                <div>
+                    <span class="badge bg-primary fs-6 shadow-sm" th:text="${comunidad.nombre}">Nombre Comunidad</span>
+                    <button class="btn btn-sm btn-outline-danger ms-2 shadow-sm" onclick="window.print()">
+                        <i class="bi bi-file-pdf"></i> Exportar PDF
+                    </button>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-success h-100">
+                        <div class="card-header bg-success text-white py-2">
+                            <h5 class="mb-0 small text-uppercase fw-bold">ACTIVO (Bienes y Derechos)</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0">
+                                <tbody class="small">
+                                <tr>
+                                    <td class="ps-3"><strong>Tesorería (Bancos)</strong><br><small class="text-muted">Saldos según Norma 43</small></td>
+                                    <td class="text-end pe-3 fw-bold align-middle" th:text="${#numbers.formatDecimal(balance.saldoBancos, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-3"><strong>Cuentas a cobrar (Morosidad)</strong><br><small class="text-muted">Recibos pendientes y devueltos</small></td>
+                                    <td class="text-end pe-3 fw-bold text-danger align-middle" th:text="${#numbers.formatDecimal(balance.deudasVecinos, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-3"><strong>Otros Activos</strong><br><small class="text-muted">Ajustes y saldos técnicos</small></td>
+                                    <td class="text-end pe-3 align-middle" th:text="${#numbers.formatDecimal(balance.otrosActivos, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+                                </tr>
+                                </tbody>
+                                <tfoot class="table-light border-top-2">
+                                <tr class="fs-6 fw-bold">
+                                    <td class="ps-3 text-success text-uppercase">TOTAL ACTIVO</td>
+                                    <td class="text-end pe-3 text-success" th:text="${#numbers.formatDecimal(balance.totalActivo, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-primary h-100">
+                        <div class="card-header bg-primary text-white py-2">
+                            <h5 class="mb-0 small text-uppercase fw-bold">PASIVO Y PATRIMONIO (Obligaciones)</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0">
+                                <tbody class="small">
+                                <tr>
+                                    <td class="ps-3"><strong>Deudas con Proveedores</strong><br><small class="text-muted">Facturas pendientes de pago</small></td>
+                                    <td class="text-end pe-3 fw-bold text-warning align-middle" th:text="${#numbers.formatDecimal(balance.deudasProveedores, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-3"><strong>Fondos de Reserva</strong><br><small class="text-muted">Fondo legal obligatorio</small></td>
+                                    <td class="text-end pe-3 align-middle" th:text="${#numbers.formatDecimal(balance.fondosReserva, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-3"><strong>Resultado del Ejercicio</strong><br><small class="text-muted">Excedente / Déficit del periodo</small></td>
+                                    <td class="text-end pe-3 fw-bold align-middle" th:text="${#numbers.formatDecimal(balance.resultadoEjercicio, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+                                </tr>
+                                </tbody>
+                                <tfoot class="table-light border-top-2">
+                                <tr class="fs-6 fw-bold">
+                                    <td class="ps-3 text-primary text-uppercase">TOTAL PASIVO</td>
+                                    <td class="text-end pe-3 text-primary" th:text="${#numbers.formatDecimal(balance.totalPasivo, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert mt-4 text-center shadow-sm border-0"
+                 th:classappend="${balance.totalActivo.compareTo(balance.totalPasivo) == 0} ? 'alert-success' : 'alert-danger'">
+                <i class="bi" th:classappend="${balance.totalActivo.compareTo(balance.totalPasivo) == 0} ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+                <span class="fw-bold" th:text="${balance.totalActivo.compareTo(balance.totalPasivo) == 0} ? ' El balance está cuadrado correctamente.' : ' Existe un descuadre en la contabilidad patrimonial.'"></span>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

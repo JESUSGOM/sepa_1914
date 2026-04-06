@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Conciliación Avanzada - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/bancos/movimientos/{id}(id=${comunidad.id})}">Extracto</a></li>
+                    <li class="breadcrumb-item active">Conciliación Manual</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="bi bi-arrow-left-right text-primary"></i>
+                    Conciliación de <span th:text="${tipoConciliacion == 'PAGO' ? 'Pago a Proveedor' : 'Ingreso de Vecinos'}">Movimiento</span>
+                </h1>
+                <span class="badge bg-secondary p-2" th:text="${comunidad.nombre}">Comunidad</span>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card border-primary shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white fw-bold py-3">
+                            <i class="bi bi-bank me-2"></i> Datos del Extracto
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="mb-4">
+                                <label class="text-muted small fw-bold text-uppercase d-block">Importe a Justificar</label>
+                                <h1 class="display-6 fw-bold text-primary" id="importe-banco-txt"
+                                    th:text="${#numbers.formatDecimal(movimiento.importe, 1, 2, 'COMMA')} + ' €'">0,00 €</h1>
+                                <input type="hidden" id="importe-objetivo" th:value="${movimiento.importe}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="text-muted small fw-bold text-uppercase d-block">Concepto Bancario</label>
+                                <div class="p-3 bg-light border rounded text-dark font-monospace small" th:text="${movimiento.concepto}">CONCEPTO</div>
+                            </div>
+                            <div class="row mb-0">
+                                <div class="col-6">
+                                    <label class="text-muted small fw-bold text-uppercase d-block">Operación</label>
+                                    <p class="mb-0" th:text="${#temporals.format(movimiento.fechaOperacion, 'dd/MM/yyyy')}"></p>
+                                </div>
+                                <div class="col-6">
+                                    <label class="text-muted small fw-bold text-uppercase d-block">Signo</label>
+                                    <span th:class="${movimiento.signo == '1' ? 'text-danger' : 'text-success'}"
+                                          th:text="${movimiento.signo == '1' ? 'SALIDA/PAGO' : 'ENTRADA/INGRESO'}"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div th:if="${tipoConciliacion == 'INGRESO'}" class="card border-info shadow-sm">
+                        <div class="card-header bg-info text-white fw-bold">
+                            <i class="bi bi-water me-2"></i> Conciliación en Cascada
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted">Use esta opción si es una transferencia de un vecino para cubrir varias deudas.</p>
+                            <form th:action="@{/bancos/conciliar-cascada}" method="post">
+                                <input type="hidden" name="movimientoId" th:value="${movimiento.id}">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Vecino Pagador</label>
+                                    <select name="vecinoId" class="form-select" required>
+                                        <option value="">-- Buscar vecino --</option>
+                                        <option th:each="v : ${vecinos}" th:value="${v.id}" th:text="${v.nombre}"></option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-info text-white w-100 fw-bold">Aplicar Cascada</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <form th:if="${tipoConciliacion == 'INGRESO'}" th:action="@{/bancos/conciliar/vincular-masivo}" method="post" id="form-conciliar">
+                        <input type="hidden" name="movimientoId" th:value="${movimiento.id}">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+                                <span class="fw-bold"><i class="bi bi-list-check me-2"></i> Selección de Recibos para Remesa</span>
+                                <span id="suma-badge" class="badge bg-light text-dark fs-6">Suma: 0,00 €</span>
+                            </div>
+                            <div class="card-body p-0 overflow-auto" style="max-height: 550px;">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th class="text-center" style="width: 60px;">
+                                            <input type="checkbox" id="selectAll" class="form-check-input">
+                                        </th>
+                                        <th>Emisión</th>
+                                        <th>Vecino</th>
+                                        <th class="text-end pe-4">Importe</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="r : ${recibos}">
+                                        <td class="text-center">
+                                            <input type="checkbox" name="reciboIds" th:value="${r.id}"
+                                                   class="form-check-input check-recibo" th:data-importe="${r.importe}">
+                                        </td>
+                                        <td th:text="${#temporals.format(r.fechaEmision, 'dd/MM/yyyy')}"></td>
+                                        <td th:text="${r.vecino.nombre}"></td>
+                                        <td class="text-end pe-4 fw-bold text-success"
+                                            th:text="${#numbers.formatDecimal(r.importe, 1, 2, 'COMMA')} + ' €'"></td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="card-footer bg-white py-4 text-end">
+                                <div id="info-alerta" class="small text-muted mb-3 text-start">
+                                    Seleccione los recibos hasta cuadrar el importe del banco.
+                                </div>
+                                <button type="submit" class="btn btn-success btn-lg px-5 shadow" id="btn-submit" disabled>
+                                    Vincular Selección
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div th:if="${tipoConciliacion == 'PAGO'}">
+                        <div class="card border-primary shadow-sm mb-4">
+                            <div class="card-header bg-light border-bottom py-2 fw-bold text-primary small">
+                                <i class="bi bi-magic me-2"></i> OPCIÓN A: CONCILIAR CONTRA SALDO INICIAL / MAYOR
+                            </div>
+                            <div class="card-body py-3">
+                                <form th:action="@{/contabilidad/conciliar-manual-directo}" method="post" class="row g-2">
+                                    <input type="hidden" name="movimientoBancarioId" th:value="${movimiento.id}">
+                                    <div class="col-md-8">
+                                        <select name="cuentaContableId" class="form-select form-select-sm" required>
+                                            <option value="">-- Seleccionar Cuenta (Ej: 372 - Cristina Marañón) --</option>
+                                            <option th:each="cta : ${todasLasCuentas}" th:value="${cta.id}" th:text="${cta.codigo + ' - ' + cta.nombre}"></option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="submit" class="btn btn-sm btn-primary w-100">Conciliar contra Mayor</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <form th:action="@{/bancos/conciliar/vincular-gasto}" method="post" id="form-conciliar-gasto">
+                            <input type="hidden" name="movimientoId" th:value="${movimiento.id}">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-3">
+                                    <span class="fw-bold"><i class="bi bi-file-earmark-text me-2"></i> OPCIÓN B: SELECCIÓN DE FACTURAS</span>
+                                    <span id="suma-badge-gasto" class="badge bg-light text-dark fs-6">Suma: 0,00 €</span>
+                                </div>
+                                <div class="card-body p-0 overflow-auto" style="max-height: 450px;">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th class="text-center" style="width: 60px;">Sel.</th>
+                                            <th>Fecha Fra.</th>
+                                            <th>Proveedor</th>
+                                            <th class="text-end pe-4">Importe Total</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="f : ${facturas}">
+                                            <td class="text-center">
+                                                <input type="radio" name="gastoId" th:value="${f.id}" class="form-check-input check-recibo" th:data-importe="${f.importeTotal}">
+                                            </td>
+                                            <td th:text="${#temporals.format(f.fecha, 'dd/MM/yyyy')}"></td>
+                                            <td th:text="${f.proveedor}"></td>
+                                            <td class="text-end pe-4 fw-bold text-danger" th:text="${#numbers.formatDecimal(f.importeTotal, 1, 2, 'COMMA')} + ' €'"></td>
+                                        </tr>
+                                        <tr th:if="${#lists.isEmpty(facturas)}">
+                                            <td colspan="4" class="text-center py-5 text-muted">No hay facturas pendientes de pago.</td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="card-footer bg-white py-4 text-end">
+                                    <button type="submit" class="btn btn-danger btn-lg px-5 shadow" id="btn-submit-gasto" disabled>Asentar Pago Gasto</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+<script th:inline="none">
+    $(document).ready(function() {
+        const importeObjetivo = Math.abs(parseFloat($('#importe-objetivo').val()));
+
+        // Seleccionar/Deseleccionar todos
+        $('#selectAll').on('change', function() {
+            $('.check-recibo').prop('checked', $(this).prop('checked')).trigger('change');
+        });
+
+        $('.check-recibo').on('change', function() {
+            let totalSeleccionado = 0;
+
+            // Sumamos todos los que estén marcados
+            $('.check-recibo:checked').each(function() {
+                totalSeleccionado += Math.abs(parseFloat($(this).data('importe')));
+            });
+
+            const diferencia = Math.abs(totalSeleccionado - importeObjetivo);
+            const totalFormateado = totalSeleccionado.toLocaleString('es-ES', { minimumFractionDigits: 2 });
+
+            if (diferencia < 0.05) {
+                $('#btn-submit, #btn-submit-gasto').prop('disabled', false);
+                $('#suma-badge, #suma-badge-gasto').text('CUADRADO: ' + totalFormateado + ' €').removeClass('bg-light text-dark').addClass('bg-success text-white');
+            } else {
+                $('#btn-submit, #btn-submit-gasto').prop('disabled', true);
+                $('#suma-badge, #suma-badge-gasto').text('Suma: ' + totalFormateado + ' €').removeClass('bg-success text-white').addClass('bg-light text-dark');
+            }
+        });
+    });
+</script>
+</body>
+</html>

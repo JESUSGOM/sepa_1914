@@ -1,0 +1,63 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: Arial, sans-serif; line-height: 1.6; font-size: 11pt; color: #333; }
+        .page-break { page-break-after: always; }
+        .header { text-align: center; border-bottom: 2px solid #0d6efd; margin-bottom: 20px; }
+        .comunidad-nombre { font-size: 14pt; font-weight: bold; text-transform: uppercase; color: #0d6efd; }
+        .destinatario-box { margin: 30px 0; padding: 15px; border: 1px solid #ddd; width: 50%; float: right; background-color: #f9f9f9; }
+        .clear { clear: both; }
+        .seccion-cita { background-color: #f8f9fa; border-left: 5px solid #0d6efd; padding: 15px; margin: 20px 0; }
+        .signature-box { margin-top: 50px; text-align: center; width: 250px; float: right; }
+    </style>
+</head>
+<body>
+
+<div th:each="vecino, iterStat : ${vecinos}" th:class="${!iterStat.last} ? 'page-break' : ''">
+
+    <div class="header">
+        <div class="comunidad-nombre" th:text="${comunidad.nombre}">COMUNIDAD</div>
+        <div style="font-weight: bold;">CONVOCATORIA JUNTA GENERAL ORDINARIA [[${anio}]]</div>
+    </div>
+
+    <div class="destinatario-box">
+        <strong>Sr/a. <span th:text="${vecino.nombre}">Nombre</span></strong><br/>
+        Vivienda: <span th:text="${vecino.vivienda}">Vivienda</span><br/>
+        <span th:text="${comunidad.poblacion}">Población</span>
+    </div>
+    <div class="clear"></div>
+
+    <p>Estimado/a vecino/a:</p>
+    <p>
+        Por la presente, se le convoca a la <strong>Junta General Ordinaria</strong> que se celebrará en
+        <span th:text="${lugarJunta}" style="font-weight: bold;">LUGAR</span>, el próximo día
+        <span th:text="${fechaJunta}" style="font-weight: bold;">FECHA</span>, con el siguiente horario:
+    </p>
+
+    <div class="seccion-cita">
+        <strong>1ª Convocatoria:</strong> [[${hora1}]] horas.<br/>
+        <strong>2ª Convocatoria:</strong> [[${hora2}]] horas (en caso de no haber quorum).
+    </div>
+
+    <p style="text-decoration: underline; font-weight: bold;">ORDEN DEL DÍA:</p>
+    <ol>
+        <li th:each="punto : ${ordenDelDia}" th:text="${punto}">Punto del día</li>
+    </ol>
+
+    <p style="font-size: 9pt; color: #666; margin-top: 30px;">
+        Se le recuerda que, conforme al Art. 15.2 de la LPH, solo los propietarios al corriente de pago podrán ejercer su derecho a voto.
+    </p>
+
+    <div class="signature-box">
+        <p>En <span th:text="${comunidad.poblacion}">POBLACIÓN</span>, a <span th:text="${fechaActual}">FECHA</span></p>
+        <div style="border-top: 1px solid #000; padding-top: 5px; margin-top: 40px;">
+            <strong>El Secretario-Administrador</strong>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

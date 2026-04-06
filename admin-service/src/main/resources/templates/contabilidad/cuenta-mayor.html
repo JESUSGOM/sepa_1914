@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head}">
+    <title>Libro Mayor - SEPA 1914</title>
+</head>
+<body class="bg-light">
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{layout :: menu}"></div>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+            <nav aria-label="breadcrumb" class="mb-2">
+                <ol class="breadcrumb mb-0 small">
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
+                    <li class="breadcrumb-item"><a th:href="@{/comunidades/detalle/{id}(id=${comunidad.id})}" th:text="${comunidad.nombre}">Comunidad</a></li>
+                    <li class="breadcrumb-item"><a th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id})}">Plan de Cuentas</a></li>
+                    <li class="breadcrumb-item active">Libro Mayor</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <div>
+                    <h1 class="h4 mb-0"><i class="bi bi-book text-primary me-2"></i>Libro Mayor</h1>
+                    <div class="mt-1">
+                        <span class="badge bg-dark" th:text="${cuenta.codigo}"></span>
+                        <span class="fw-bold text-secondary ms-1" th:text="${cuenta.nombre}"></span>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <div class="p-2 bg-white rounded shadow-sm border-start border-4"
+                         th:classappend="${saldoFinalAnual >= 0 ? 'border-success' : 'border-danger'}">
+                        <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.6rem;">Saldo Final Ejercicio</small>
+                        <span class="h5 mb-0 fw-bold" th:text="${#numbers.formatDecimal(saldoFinalAnual, 1, 2, 'COMMA')} + ' €'"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="bg-secondary text-white small text-uppercase">
+                            <tr>
+                                <th class="ps-3 py-2" style="width: 12%">Fecha</th>
+                                <th class="text-center" style="width: 10%">Asiento</th>
+                                <th style="width: 38%">Concepto</th>
+                                <th class="text-end" style="width: 13%">Debe</th>
+                                <th class="text-end" style="width: 13%">Haber</th>
+                                <th class="text-end pe-3" style="width: 14%">Saldo Acum.</th>
+                            </tr>
+                            </thead>
+                            <tbody class="small">
+                            <tr th:each="m : ${movimientos}">
+                                <td class="ps-3" th:text="${#temporals.format(m.fecha(), 'dd/MM/yyyy')}"></td>
+                                <td class="text-center"><span class="badge bg-light text-dark border" th:text="${m.numeroAsiento()}"></span></td>
+                                <td th:text="${m.concepto()}"></td>
+                                <td class="text-end text-success fw-bold" th:text="${m.debe() > 0 ? #numbers.formatDecimal(m.debe(), 1, 2, 'COMMA') + ' €' : ''}"></td>
+                                <td class="text-end text-danger fw-bold" th:text="${m.haber() > 0 ? #numbers.formatDecimal(m.haber(), 1, 2, 'COMMA') + ' €' : ''}"></td>
+                                <td class="text-end pe-3 fw-bold bg-light-subtle"
+                                    th:classappend="${m.saldoAcumulado() >= 0 ? 'text-primary' : 'text-danger'}"
+                                    th:text="${#numbers.formatDecimal(m.saldoAcumulado(), 1, 2, 'COMMA')} + ' €'"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <nav th:if="${totalPages > 1}" class="mt-4">
+                <ul class="pagination pagination-sm justify-content-center">
+                    <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
+                        <a class="page-link shadow-sm" th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, page=${currentPage - 1})}">Anterior</a>
+                    </li>
+                    <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}" th:classappend="${currentPage == i ? 'active' : ''}">
+                        <a class="page-link shadow-sm" th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, page=${i})}" th:text="${i + 1}">1</a>
+                    </li>
+                    <li class="page-item" th:classappend="${currentPage == totalPages - 1 ? 'disabled' : ''}">
+                        <a class="page-link shadow-sm" th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, page=${currentPage + 1})}">Siguiente</a>
+                    </li>
+                </ul>
+                <p class="text-center text-muted small" th:text="${'Mostrando movimientos ' + (currentPage * 20 + 1) + ' al ' + (currentPage * 20 + movimientos.size()) + ' de ' + totalItems}"></p>
+            </nav>
+
+        </main>
+    </div>
+</div>
+</body>
+</html>
