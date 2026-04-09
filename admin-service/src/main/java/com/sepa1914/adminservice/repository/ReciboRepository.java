@@ -25,13 +25,18 @@ public interface ReciboRepository extends JpaRepository<Recibo, Long> {
 
     /**
      * Recupera todos los recibos de una comunidad.
+     * OPTIMIZACIÓN GTI: JOIN FETCH para evitar goteo de consultas a vecinos.
      */
-    List<Recibo> findByComunidadId(Long comunidadId);
+    @Query("SELECT r FROM Recibo r JOIN FETCH r.vecino WHERE r.comunidad.id = :comunidadId")
+    List<Recibo> findByComunidadId(@Param("comunidadId") Long comunidadId);
 
     /**
      * Recupera todos los recibos de una comunidad con paginación.
+     * OPTIMIZACIÓN GTI: JOIN FETCH para evitar N+1 en el grid de listado.
      */
-    Page<Recibo> findByComunidadIdOrderByFechaEmisionDesc(Long comunidadId, Pageable pageable);
+    @Query(value = "SELECT r FROM Recibo r JOIN FETCH r.vecino WHERE r.comunidad.id = :comId ORDER BY r.fechaEmision ASC",
+            countQuery = "SELECT count(r) FROM Recibo r WHERE r.comunidad.id = :comId")
+    Page<Recibo> findByComunidadIdOrderByFechaEmisionAsc(@Param("comId") Long comId, Pageable pageable);
 
     /**
      * Busca recibos por un estado específico.
@@ -67,8 +72,10 @@ public interface ReciboRepository extends JpaRepository<Recibo, Long> {
 
     /**
      * Recupera recibos filtrando por varios estados.
+     * OPTIMIZACIÓN GTI: JOIN FETCH para carga masiva de propietarios.
      */
-    List<Recibo> findByComunidadIdAndEstadoIn(Long comunidadId, Collection<EstadoRecibo> estados);
+    @Query("SELECT r FROM Recibo r JOIN FETCH r.vecino WHERE r.comunidad.id = :comId AND r.estado IN :estados")
+    List<Recibo> findByComunidadIdAndEstadoIn(@Param("comId") Long comunidadId, @Param("estados") Collection<EstadoRecibo> estados);
 
     /**
      * Localiza recibos por importe exacto y estado (CONCILIACIÓN AUTOMÁTICA).
@@ -132,8 +139,10 @@ public interface ReciboRepository extends JpaRepository<Recibo, Long> {
 
     /**
      * Lista recibos pendientes ordenados para ver las fechas.
+     * OPTIMIZACIÓN GTI: JOIN FETCH para agilizar la pantalla de liquidación.
      */
-    List<Recibo> findByComunidadIdAndEstadoOrderByFechaEmisionDesc(Long comunidadId, EstadoRecibo estado);
+    @Query("SELECT r FROM Recibo r JOIN FETCH r.vecino WHERE r.comunidad.id = :comId AND r.estado = :estado ORDER BY r.fechaEmision DESC")
+    List<Recibo> findByComunidadIdAndEstadoOrderByFechaEmisionAsc(Long comunidadId, EstadoRecibo estado);
 
     /**
      * Sumatorio Anual corregido (Soporta Mes nulo para totales anuales).
@@ -178,4 +187,6 @@ public interface ReciboRepository extends JpaRepository<Recibo, Long> {
 
     List<Recibo> findByVecinoId(Long vecinoId);
     List<Recibo> findByVecinoIdAndEstadoNot(Long vecinoId, EstadoRecibo estado);
+
+    List<Recibo> findByVecinoIdOrderByFechaEmisionAsc(Long vecinoId);
 }

@@ -11,16 +11,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
  * Controlador para la gestión de conceptos de cobro.
- * REPARADO: Filtrado de sugeridos a cero y gestión de mes de inicio.
- * MANTIENE TODA LA FUNCIONALIDAD ORIGINAL.
+ * REFACTURADO: Conceptos Maestros Globales y eliminación de filtros restrictivos.
  */
 @Controller
 @RequestMapping("/conceptos")
@@ -35,11 +32,13 @@ public class ConceptoController {
     @Autowired private PresupuestoRepository presupuestoRepo;
 
     /**
-     * Muestra el listado de conceptos maestros (plantillas globales).
+     * Muestra el listado de conceptos maestros.
+     * Ahora son tratados como plantillas globales para todo el sistema.
      */
     @GetMapping("/maestro")
     public String listarMaestro(@RequestParam(required = false) Long comunidadId, Model model) {
-        Long idParaCuentas = (comunidadId != null) ? comunidadId : 3L;
+        // Si no viene comunidad, usamos una por defecto para cargar el catálogo de cuentas sugerido
+        Long idParaCuentas = (comunidadId != null) ? comunidadId : 1L;
 
         List<ConceptoCobro> maestros = conceptoRepository.findByVecinoIsNull();
         List<CuentaContable> ingresos = cuentaRepository.findByComunidadIdAndTipo(idParaCuentas, TipoCuenta.INGRESO);
@@ -51,13 +50,17 @@ public class ConceptoController {
         model.addAttribute("activePage", "maestro-conceptos");
 
         ConceptoCobro nuevoMaestro = new ConceptoCobro();
-        nuevoMaestro.setMesInicio(LocalDate.now().getMonthValue()); // Sugerir mes actual
+        nuevoMaestro.setMesInicio(LocalDate.now().getMonthValue());
         nuevoMaestro.setActivo(true);
         model.addAttribute("nuevoMaestro", nuevoMaestro);
 
         return "conceptos-maestro";
     }
 
+    /**
+     * Guarda una plantilla maestra. Se asegura de que comunidad_id y vecino_id sean NULL
+     * para que sea visible globalmente.
+     */
     @PostMapping("/maestro/guardar")
     public String guardarMaestro(@ModelAttribute ConceptoCobro concepto,
                                  @RequestParam(required = false) Long cuentaContableId) {
@@ -69,10 +72,11 @@ public class ConceptoController {
             cuentaRepository.findById(cuentaContableId).ifPresent(concepto::setCuentaContable);
         }
 
+        // VITAL: Para que sea GLOBAL, estos campos deben ser null
         concepto.setVecino(null);
         concepto.setComunidad(null);
 
-        log.info("Guardando plantilla maestra: {} con inicio en mes {}", concepto.getDescripcion(), concepto.getMesInicio());
+        log.info("Guardando concepto maestro global: {}", concepto.getDescripcion());
         conceptoRepository.save(concepto);
         return "redirect:/conceptos/maestro";
     }
@@ -84,36 +88,31 @@ public class ConceptoController {
     }
 
     /**
-     * Gestiona los conceptos de un vecino.
-     * REPARACIÓN: Filtra el combo para no mostrar sugeridos de 0.00€.
+     * Gestiona los conceptos asignados a un vecino específico.
+     * CORRECCIÓN GTI: Se eliminan filtros de presupuesto para mostrar TODO el catálogo maestro.
      */
     @GetMapping("/vecino/{vecinoId}")
     public String gestionarConceptosVecino(@PathVariable Long vecinoId, Model model) {
-        Vecino vecino = vecinoRepository.findById(vecinoId).orElseThrow();
+        Vecino vecino = vecinoRepository.findById(vecinoId)
+                .orElseThrow(() -> new RuntimeException("Vecino no encontrado"));
+
         Comunidad comunidad = vecino.getComunidad();
-        int anioActual = LocalDate.now().getYear();
 
+        // Obtenemos los ya asignados al vecino
         List<ConceptoCobro> conceptosDelVecino = conceptoRepository.findByVecino(vecino);
+
+        // Obtenemos TODOS los maestros globales (sin filtrar por presupuesto)
         List<ConceptoCobro> todosLosMaestros = conceptoRepository.findByVecinoIsNull();
-
-        // FILTRADO DINÁMICO: Solo maestros con presupuesto asignado (Sugerido > 0)
-        List<ConceptoCobro> maestrosFiltrados = todosLosMaestros.stream().filter(m -> {
-            if (m.getCuentaContable() == null) return true; // Si no tiene cuenta, se muestra para asignación manual
-
-            BigDecimal presupuestoAnual = presupuestoRepo
-                    .findByComunidadIdAndCuentaIdAndAnio(comunidad.getId(), m.getCuentaContable().getId(), anioActual)
-                    .map(Presupuesto::getImporte).orElse(BigDecimal.ZERO);
-
-            return presupuestoAnual.compareTo(BigDecimal.ZERO) > 0;
-        }).collect(Collectors.toList());
-
-        model.addAttribute("cuentasIngreso", cuentaRepository.findByComunidadIdAndTipo(comunidad.getId(), TipoCuenta.INGRESO));
-        model.addAttribute("cuentasPasivo", cuentaRepository.findByComunidadIdAndTipo(comunidad.getId(), TipoCuenta.PASIVO));
 
         model.addAttribute("activePage", "vecinos");
         model.addAttribute("vecino", vecino);
+        model.addAttribute("comunidad", comunidad);
         model.addAttribute("conceptos", conceptosDelVecino);
-        model.addAttribute("conceptosMaestros", maestrosFiltrados); // Enviamos solo la lista limpia
+        model.addAttribute("conceptosMaestros", todosLosMaestros); // Combo ahora completo
+
+        // Cuentas contables para asignación manual si fuera necesario
+        model.addAttribute("cuentasIngreso", cuentaRepository.findByComunidadIdAndTipo(comunidad.getId(), TipoCuenta.INGRESO));
+        model.addAttribute("cuentasPasivo", cuentaRepository.findByComunidadIdAndTipo(comunidad.getId(), TipoCuenta.PASIVO));
 
         ConceptoCobro nuevo = new ConceptoCobro();
         nuevo.setMesInicio(LocalDate.now().getMonthValue());
@@ -122,6 +121,10 @@ public class ConceptoController {
         return "conceptos-vecino";
     }
 
+    /**
+     * Asigna un concepto a un vecino.
+     * Incluye la lógica de personalización de descripción con el nombre de la FINCA.
+     */
     @PostMapping("/guardar")
     public String guardarConcepto(@ModelAttribute ConceptoCobro concepto,
                                   @RequestParam Long vecinoId,
@@ -129,12 +132,15 @@ public class ConceptoController {
                                   RedirectAttributes ra) {
         try {
             Vecino v = vecinoRepository.findById(vecinoId).orElseThrow();
+
+            // Vinculamos el concepto al vecino y a su comunidad
             concepto.setVecino(v);
             concepto.setComunidad(v.getComunidad());
 
-            // REQUISITO: "CUOTA COMUNIDAD" + FINCA si es un concepto de presupuesto
-            if (concepto.getDescripcion() != null && concepto.getDescripcion().contains("Presupuesto")) {
-                concepto.setDescripcion("CUOTA COMUNIDAD " + (v.getVivienda() != null ? v.getVivienda() : ""));
+            // LÓGICA GTI: Si el concepto es de cuota, añadimos la vivienda a la descripción automáticamente
+            if (concepto.getDescripcion() != null && concepto.getDescripcion().toLowerCase().contains("presupuesto")) {
+                String vivienda = (v.getVivienda() != null) ? v.getVivienda() : "";
+                concepto.setDescripcion("CUOTA COMUNIDAD " + vivienda);
             }
 
             if (concepto.getMesInicio() == null) {
@@ -145,12 +151,13 @@ public class ConceptoController {
                 cuentaRepository.findById(cuentaContableId).ifPresent(concepto::setCuentaContable);
             }
 
-            log.info("Asignando concepto a {}: {} (Inicio: mes {})", v.getNombre(), concepto.getDescripcion(), concepto.getMesInicio());
+            log.info("Asignando concepto a vecino {}: {}", v.getNombre(), concepto.getDescripcion());
             conceptoRepository.save(concepto);
-            ra.addFlashAttribute("exito", "Concepto asignado correctamente.");
+            ra.addFlashAttribute("exito", "Concepto asignado al propietario con éxito.");
 
         } catch (Exception e) {
-            ra.addFlashAttribute("error", "Fallo al guardar: " + e.getMessage());
+            log.error("Error al asignar concepto", e);
+            ra.addFlashAttribute("error", "Error: " + e.getMessage());
         }
         return "redirect:/conceptos/vecino/" + vecinoId;
     }
@@ -193,6 +200,7 @@ public class ConceptoController {
             cuentaRepository.findById(cuentaContableId).ifPresent(c::setCuentaContable);
         }
 
+        log.info("Actualizando plantilla maestra ID: {}", id);
         conceptoRepository.save(c);
         return "redirect:/conceptos/maestro";
     }

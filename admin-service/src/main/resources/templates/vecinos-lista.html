@@ -9,7 +9,6 @@
         <div th:replace="~{layout :: menu}"></div>
 
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb small">
                     <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
@@ -24,14 +23,9 @@
                     Propietarios y Coeficientes
                 </h1>
                 <div class="btn-toolbar mb-2 mb-md-0">
-                    <div class="btn-group me-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-file-earmark-excel me-1"></i> Exportar
-                        </button>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-primary shadow-sm px-3" data-bs-toggle="modal" data-bs-target="#modalNuevoVecino">
+                    <a th:href="@{/vecinos/nuevo(comunidadId=${comunidad.id})}" class="btn btn-sm btn-primary shadow-sm px-3">
                         <i class="bi bi-person-plus-fill me-1"></i> Añadir Propietario
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -49,15 +43,14 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0" id="tablaVecinos">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                             <tr>
-                                <th class="ps-4" style="width: 100px;">Viv/Local</th>
+                                <th class="ps-4">Viv/Local</th>
                                 <th>Nombre del Propietario</th>
                                 <th>NIF/CIF</th>
-                                <th>Teléfonos de Contacto</th>
+                                <th>Cobro</th>
                                 <th class="text-center">Coeficiente %</th>
-                                <th class="text-center">Cobro</th>
                                 <th class="text-end pe-4">Gestión</th>
                             </tr>
                             </thead>
@@ -65,7 +58,6 @@
                             <tr th:each="v : ${vecinos}" th:classappend="${!v.activo} ? 'table-secondary opacity-75' : ''">
                                 <td class="ps-4">
                                     <span class="fw-bold text-dark" th:text="${v.vivienda}">1º A</span>
-                                    <div class="small text-muted" th:text="${v.pisoPorton}">-</div>
                                 </td>
                                 <td>
                                     <div class="fw-bold" th:text="${v.nombre}">Nombre</div>
@@ -73,53 +65,55 @@
                                         <i class="bi bi-envelope-at me-1"></i><span th:text="${v.email}"></span>
                                     </div>
                                 </td>
+                                <td><code class="text-dark" th:text="${v.nif}">12345678Z</code></td>
                                 <td>
-                                    <code class="text-dark" th:text="${v.nif}">12345678Z</code>
-                                </td>
-                                <td>
-                                    <div class="small" th:if="${v.telefono_1 != null}"><i class="bi bi-phone me-1"></i> <span th:text="${v.telefono_1}"></span></div>
-                                    <div class="small" th:if="${v.telefono_2 != null}"><i class="bi bi-telephone me-1"></i> <span th:text="${v.telefono_2}"></span></div>
+                                    <span th:if="${v.domiciliado}" class="badge bg-success"><i class="bi bi-bank me-1"></i> SEPA</span>
+                                    <span th:if="${!v.domiciliado}" class="badge bg-secondary"><i class="bi bi-cash me-1"></i> Manual</span>
                                 </td>
                                 <td class="text-center">
-                                        <span class="badge bg-primary-subtle text-primary fs-6 border border-primary"
-                                              th:text="${#numbers.formatDecimal(v.coeficiente, 1, 4, 'COMMA')} + ' %'">
-                                            0,0000 %
-                                        </span>
-                                </td>
-                                <td class="text-center">
-                                    <span th:if="${v.domiciliado}" class="badge bg-success" title="Cobro por Banco"><i class="bi bi-bank me-1"></i> SEPA</span>
-                                    <span th:if="${!v.domiciliado}" class="badge bg-secondary" title="Pago Manual"><i class="bi bi-cash me-1"></i> Manual</span>
+                                    <span class="badge bg-primary-subtle text-primary fs-6 border border-primary"
+                                          th:text="${#numbers.formatDecimal(v.coeficiente, 1, 4, 'COMMA')} + ' %'">
+                                    </span>
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="btn-group shadow-sm">
-                                        <a th:href="@{/conceptos/vecino/{id}(id=${v.id})}" class="btn btn-sm btn-outline-dark" title="Conceptos">
+                                        <a th:href="@{/conceptos/vecino/{id}(id=${v.id})}"
+                                           class="btn btn-sm btn-outline-dark"
+                                           title="Conceptos de Cobro">
                                             <i class="bi bi-list-stars"></i>
                                         </a>
+
+                                        <a th:if="${v.iban != null and !#strings.isEmpty(v.iban)}"
+                                           th:href="@{/vecinos/mandato-pdf/{id}(id=${v.id})}"
+                                           class="btn btn-sm btn-outline-danger"
+                                           title="Descargar Mandato SEPA para Firma"
+                                           target="_blank">
+                                            <i class="bi bi-file-earmark-check"></i>
+                                        </a>
+
                                         <button type="button" class="btn btn-sm btn-warning"
                                                 th:data-id="${v.id}"
                                                 th:data-nombre="${v.nombre}"
                                                 th:data-nif="${v.nif}"
                                                 th:data-vivienda="${v.vivienda}"
-                                                th:data-pisoporton="${v.pisoPorton}"
+                                                th:data-piso="${v.pisoPorton}"
                                                 th:data-tel1="${v.telefono_1}"
-                                                th:data-tel2="${v.telefono_2}"
-                                                th:data-tel3="${v.telefono_3}"
                                                 th:data-email="${v.email}"
-                                                th:data-dirnotif="${v.direccionNotificacion}"
-                                                th:data-enviodigital="${v.envioDigital}"
                                                 th:data-activo="${v.activo}"
-                                                th:data-coeficiente="${v.coeficiente}"
                                                 th:data-domiciliado="${v.domiciliado}"
+                                                th:data-coef="${v.coeficiente}"
                                                 th:data-iban="${v.iban}"
                                                 th:data-bic="${v.bic}"
                                                 th:data-mandato="${v.referenciaMandato}"
-                                                th:data-notas="${v.notas}"
-                                                onclick="cargarYMostrarModal(this)">
+                                                onclick="cargarYMostrarModal(this)"
+                                                title="Editar Datos">
                                             <i class="bi bi-pencil-fill"></i>
                                         </button>
-                                        <a th:href="@{/vecinos/eliminar/{id}(id=${v.id}, comunidadId=${comunidad.id})}"
+
+                                        <a th:href="@{/vecinos/eliminar/{id}(id=${v.id})}"
                                            class="btn btn-sm btn-danger"
-                                           onclick="return confirm('¿Está seguro de eliminar esta propiedad?')">
+                                           onclick="return confirm('¿Eliminar propiedad y todos sus datos asociados?')"
+                                           title="Eliminar Vecino">
                                             <i class="bi bi-trash-fill"></i>
                                         </a>
                                     </div>
@@ -134,19 +128,16 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalEditarVecino" tabindex="-1" aria-labelledby="modalEditarLabel" aria-hidden="true">
+<div class="modal fade" id="modalEditarVecino" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-warning py-3">
-                <h5 class="modal-title fw-bold" id="modalEditarLabel">
-                    <i class="bi bi-pencil-square me-2"></i> FICHA MAESTRA DEL PROPIETARIO
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i> FICHA MAESTRA DEL PROPIETARIO</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form th:action="@{/vecinos/guardar(comunidadId=${comunidad.id})}" method="post">
+            <form th:action="@{/vecinos/guardar(comunidadId=${comunidad.id})}" method="post" autocomplete="off">
                 <div class="modal-body p-4">
                     <input type="hidden" name="id" id="editId">
-
                     <div class="row g-4">
                         <div class="col-md-6">
                             <div class="p-3 bg-light rounded border">
@@ -161,101 +152,56 @@
                                         <input type="text" name="nif" id="editNif" class="form-control" required>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label small fw-bold">Referencia Vivienda</label>
+                                        <label class="form-label small fw-bold">Vivienda</label>
                                         <input type="text" name="vivienda" id="editVivienda" class="form-control" required>
                                     </div>
-                                    <div class="col-md-12">
-                                        <label class="form-label small fw-bold">Piso, Letra, Portón (Desglose)</label>
-                                        <input type="text" name="pisoPorton" id="editPisoPorton" class="form-control">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="p-3 bg-light rounded border">
-                                <h6 class="fw-bold mb-3 border-bottom pb-2 text-uppercase small text-muted">2. Datos de Contacto</h6>
-                                <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label small fw-bold">Teléfono 1</label>
-                                        <input type="text" name="telefono_1" id="editTel1" class="form-control">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label small fw-bold">Teléfono 2</label>
-                                        <input type="text" name="telefono_2" id="editTel2" class="form-control">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label small fw-bold">Teléfono 3</label>
-                                        <input type="text" name="telefono_3" id="editTel3" class="form-control">
-                                    </div>
                                     <div class="col-12">
-                                        <label class="form-label small fw-bold">Correo Electrónico Principal</label>
+                                        <label class="form-label small fw-bold">Email Principal</label>
                                         <input type="email" name="email" id="editEmail" class="form-control">
                                     </div>
-                                    <div class="col-12">
-                                        <label class="form-label small fw-bold">Dirección de Notificación</label>
-                                        <input type="text" name="direccionNotificacion" id="editDirNotif" class="form-control" placeholder="Si es distinta a la de la finca">
-                                    </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="col-md-12">
-                            <div class="p-3 bg-primary-subtle rounded border border-primary">
-                                <h6 class="fw-bold mb-3 border-bottom border-primary pb-2 text-uppercase small text-primary">3. Configuración Económica y SEPA</h6>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-primary-subtle rounded border border-primary h-100">
+                                <h6 class="fw-bold mb-3 border-bottom border-primary pb-2 text-uppercase small text-primary">2. Configuración SEPA y Banco</h6>
                                 <div class="row g-3">
-                                    <div class="col-md-3">
-                                        <label class="form-label small fw-bold text-dark">COEFICIENTE (%)</label>
-                                        <div class="input-group">
-                                            <input type="number" step="0.0001" name="coeficiente" id="editCoeficiente" class="form-control fw-bold text-primary">
-                                            <span class="input-group-text bg-primary text-white border-primary">%</span>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3 mt-auto mb-2">
-                                        <div class="form-check form-switch">
+                                    <div class="col-md-12">
+                                        <div class="form-check form-switch mb-3">
                                             <input class="form-check-input" type="checkbox" name="domiciliado" id="editDom">
-                                            <label class="form-check-label fw-bold small">¿DOMICILIAR RECIBOS?</label>
+                                            <label class="form-check-label fw-bold" for="editDom">¿DOMICILIAR RECIBOS?</label>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label small fw-bold">IBAN (Cuenta Bancaria)</label>
+                                    <div class="col-md-8">
+                                        <label class="form-label small fw-bold">IBAN</label>
                                         <input type="text" name="iban" id="editIban" class="form-control font-monospace">
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-4">
                                         <label class="form-label small fw-bold">BIC</label>
                                         <input type="text" name="bic" id="editBic" class="form-control uppercase">
                                     </div>
-                                    <div class="col-md-4 mt-3">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" name="envioDigital" id="editEnvioDigital">
-                                            <label class="form-check-label small fw-bold">Envío Digital de Documentos</label>
-                                        </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Referencia Mandato</label>
+                                        <input type="text" name="referenciaMandato" id="editMandato" class="form-control form-control-sm bg-light" readonly>
                                     </div>
-                                    <div class="col-md-4 mt-3">
+                                    <div class="col-md-6 mt-3">
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" name="activo" id="editActivo">
-                                            <label class="form-check-label small fw-bold">Propietario en Activo</label>
+                                            <label class="form-check-label small fw-bold" for="editActivo">Vecino Activo</label>
                                         </div>
                                     </div>
-                                    <div class="col-md-4 mt-2">
-                                        <label class="form-label small fw-bold text-muted small">Ref. Mandato</label>
-                                        <input type="text" name="referenciaMandato" id="editMandato" class="form-control form-control-sm bg-light" readonly>
+                                    <div class="col-md-6 mt-3">
+                                        <label class="form-label small fw-bold">Coeficiente %</label>
+                                        <input type="number" step="0.0001" name="coeficiente" id="editCoef" class="form-control">
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="col-12">
-                            <label class="form-label small fw-bold text-muted">Notas y Observaciones Internas</label>
-                            <textarea name="notas" id="editNotas" class="form-control" rows="2" placeholder="Información adicional..."></textarea>
-                        </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar sin guardar</button>
-                    <button type="submit" class="btn btn-warning px-5 fw-bold shadow-sm">
-                        <i class="bi bi-save2 me-2"></i> ACTUALIZAR DATOS DEL VECINO
-                    </button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning fw-bold px-4">ACTUALIZAR FICHA</button>
                 </div>
             </form>
         </div>
@@ -264,47 +210,28 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    /**
-     * Función que carga todos los parámetros del botón al modal
-     * Mantenemos todos los nombres de variables según tu Entidad SQL
-     */
     function cargarYMostrarModal(btn) {
         document.getElementById('editId').value = btn.getAttribute('data-id');
         document.getElementById('editNombre').value = btn.getAttribute('data-nombre');
         document.getElementById('editNif').value = btn.getAttribute('data-nif');
         document.getElementById('editVivienda').value = btn.getAttribute('data-vivienda');
-        document.getElementById('editPisoPorton').value = btn.getAttribute('data-pisoporton');
-
-        document.getElementById('editTel1').value = btn.getAttribute('data-tel1');
-        document.getElementById('editTel2').value = btn.getAttribute('data-tel2');
-        document.getElementById('editTel3').value = btn.getAttribute('data-tel3');
         document.getElementById('editEmail').value = btn.getAttribute('data-email');
-        document.getElementById('editDirNotif').value = btn.getAttribute('data-dirnotif');
-
-        document.getElementById('editEnvioDigital').checked = (btn.getAttribute('data-enviodigital') === 'true');
-        document.getElementById('editActivo').checked = (btn.getAttribute('data-activo') === 'true');
-
-        document.getElementById('editCoeficiente').value = btn.getAttribute('data-coeficiente');
-        document.getElementById('editDom').checked = (btn.getAttribute('data-domiciliado') === 'true');
         document.getElementById('editIban').value = btn.getAttribute('data-iban');
         document.getElementById('editBic').value = btn.getAttribute('data-bic');
+        document.getElementById('editCoef').value = btn.getAttribute('data-coef');
         document.getElementById('editMandato').value = btn.getAttribute('data-mandato');
-        document.getElementById('editNotas').value = btn.getAttribute('data-notas');
-
-        // Disparamos el Modal de Bootstrap
+        document.getElementById('editDom').checked = (btn.getAttribute('data-domiciliado') === 'true');
+        document.getElementById('editActivo').checked = (btn.getAttribute('data-activo') === 'true');
         var myModal = new bootstrap.Modal(document.getElementById('modalEditarVecino'));
         myModal.show();
     }
 </script>
 
 <style>
-    .font-monospace { font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
-    .uppercase { text-transform: uppercase; }
-    .breadcrumb-item a { text-decoration: none; color: #0d6efd; }
-    .table th { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    .btn-group .btn { border-radius: 4px; }
+    .font-monospace { font-family: 'Courier New', monospace; letter-spacing: 1px; }
     .bg-primary-subtle { background-color: #e7f1ff; }
+    .table-secondary { background-color: #f8f9fa !important; }
+    .uppercase { text-transform: uppercase; }
 </style>
-
 </body>
 </html>

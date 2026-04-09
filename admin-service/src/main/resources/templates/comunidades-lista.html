@@ -120,25 +120,56 @@
                                     <div class="modal fade" th:id="'modalFecha' + ${comunidad.id}" tabindex="-1" aria-hidden="true">
                                         <div class="modal-dialog">
                                             <div class="modal-content border-0 shadow">
-                                                <form th:action="@{/bancos/descargar-remesa/{id}(id=${comunidad.id})}" method="get">
+                                                <form th:action="@{/bancos/descargar-remesa/{id}(id=${comunidad.id})}" method="post">
                                                     <div class="modal-header bg-dark text-white">
-                                                        <h5 class="modal-title"><i class="bi bi-calendar-check me-2"></i>Remesa Bancaria</h5>
+                                                        <h5 class="modal-title"><i class="bi bi-calendar-check me-2"></i>Generar Remesa y Recibos</h5>
                                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                                     </div>
                                                     <div class="modal-body text-start p-4">
-                                                        <div class="alert alert-info small py-2 mb-3">
-                                                            <i class="bi bi-info-circle"></i> Se generará el fichero SEPA y se registrarán los recibos como PENDIENTES.
+                                                        <div class="alert alert-warning small py-2 mb-3">
+                                                            <i class="bi bi-exclamation-triangle"></i> <strong>Atención:</strong> Si ya existen recibos para este periodo, se borrarán y se generarán de nuevo.
                                                         </div>
-                                                        <p>Comunidad: <strong class="text-primary" th:text="${comunidad.nombre}">Nombre</strong></p>
-                                                        <div class="mb-0">
-                                                            <label class="form-label fw-bold">Fecha de Cargo:</label>
-                                                            <input type="date" name="fecha" class="form-control form-control-lg"
-                                                                   th:value="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}" required>
+
+                                                        <p class="mb-3">Comunidad: <strong class="text-primary" th:text="${comunidad.nombre}">Nombre</strong></p>
+
+                                                        <div class="row g-3">
+                                                            <div class="col-md-7">
+                                                                <label class="form-label fw-bold">Mes del recibo:</label>
+                                                                <select name="mes" class="form-select" required>
+                                                                    <option value="1">Enero</option>
+                                                                    <option value="2">Febrero</option>
+                                                                    <option value="3">Marzo</option>
+                                                                    <option value="4">Abril</option>
+                                                                    <option value="5" selected>Mayo</option>
+                                                                    <option value="6">Junio</option>
+                                                                    <option value="7">Julio</option>
+                                                                    <option value="8">Agosto</option>
+                                                                    <option value="9">Septiembre</option>
+                                                                    <option value="10">Octubre</option>
+                                                                    <option value="11">Noviembre</option>
+                                                                    <option value="12">Diciembre</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div class="col-md-5">
+                                                                <label class="form-label fw-bold">Año:</label>
+                                                                <input type="number" name="anio" class="form-control"
+                                                                       th:value="${#temporals.format(#temporals.createNow(), 'yyyy')}" required>
+                                                            </div>
+
+                                                            <div class="col-12 mt-3">
+                                                                <label class="form-label fw-bold text-secondary">Fecha de ejecución bancaria:</label>
+                                                                <input type="date" name="fechaCargo" class="form-control"
+                                                                       th:value="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}" required>
+                                                                <div class="form-text">Día en que el banco realizará el cobro.</div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div class="modal-footer bg-light">
                                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                        <button type="submit" class="btn btn-primary px-4" th:onclick="'cerrarModal(' + ${comunidad.id} + ')'">Procesar .C19</button>
+                                                        <button type="submit" class="btn btn-primary px-4" th:onclick="'cerrarModal(' + ${comunidad.id} + ')'">
+                                                            <i class="bi bi-gear-fill me-2"></i>Procesar Todo
+                                                        </button>
                                                     </div>
                                                 </form>
                                             </div>

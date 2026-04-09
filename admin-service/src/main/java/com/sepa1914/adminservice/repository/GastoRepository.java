@@ -39,4 +39,8 @@ public interface GastoRepository extends JpaRepository<Gasto, Long> {
     @Query("SELECT SUM(g.importeTotal) FROM Gasto g WHERE g.cuentaGasto.id = :cuentaId AND g.pagado = true AND YEAR(g.fechaPago) = :anio")
     BigDecimal sumImportePagadoByCuentaAndAnio(@Param("cuentaId") Long cuentaId, @Param("anio") int anio);
 
+    @Query("SELECT g.cuentaGasto.id, SUM(g.importeTotal) FROM Gasto g " +
+            "WHERE g.comunidad.id = :comId AND g.pagado = true AND YEAR(g.fechaPago) = :anio " +
+            "GROUP BY g.cuentaGasto.id")
+    List<Object[]> sumAllPagadoByComunidadAndAnio(@Param("comId") Long comId, @Param("anio") int anio);
 }

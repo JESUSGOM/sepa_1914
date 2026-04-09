@@ -38,7 +38,6 @@ public class ComunidadController {
     private final ConfiguracionRutasRepository configuracionRutasRepository;
     private final ContabilidadService contabilidadService;
     private final FicheroGeneradoRepository ficheroRepository;
-    // FIJATE AQUÍ: Añadida la pieza que faltaba para que compile
     private final LicenseService licenseService;
 
     public ComunidadController(ComunidadRepository comunidadRepository, UsuarioRepository usuarioRepository,
@@ -47,7 +46,7 @@ public class ComunidadController {
                                ConfiguracionRutasRepository configuracionRutasRepository,
                                ContabilidadService contabilidadService,
                                FicheroGeneradoRepository ficheroRepository,
-                               LicenseService licenseService) { // Inyectado en constructor
+                               LicenseService licenseService) {
         this.comunidadRepository = comunidadRepository;
         this.usuarioRepository = usuarioRepository;
         this.vecinoRepository = vecinoRepository;
@@ -57,7 +56,7 @@ public class ComunidadController {
         this.configuracionRutasRepository = configuracionRutasRepository;
         this.contabilidadService = contabilidadService;
         this.ficheroRepository = ficheroRepository;
-        this.licenseService = licenseService; // Asignado aquí
+        this.licenseService = licenseService;
     }
 
     @GetMapping("/lista")
@@ -114,30 +113,32 @@ public class ComunidadController {
         return "redirect:/comunidades/lista";
     }
 
+    // --- CORRECCIÓN AQUÍ: Puntos de entrada para guardar y actualizar ---
+
     @PostMapping("/guardar")
     public String guardarComunidad(@ModelAttribute Comunidad comunidad, Authentication auth, RedirectAttributes redirectAttributes) {
+        // Llamamos al helper con esNueva = true
         return procesarPersistenciaComunidad(comunidad, auth, redirectAttributes, true);
     }
 
     @PostMapping("/actualizar/{id}")
     public String actualizarComunidad(@PathVariable Long id, @ModelAttribute Comunidad comunidad, Authentication auth, RedirectAttributes redirectAttributes) {
         comunidad.setId(id);
+        // Llamamos al helper con esNueva = false
         return procesarPersistenciaComunidad(comunidad, auth, redirectAttributes, false);
     }
 
     /**
-     * Lógica de persistencia REFACTORIZADA para evitar el borrado accidental de vecinos (Error 500 SQL 1451).
+     * Helper privado único para procesar la lógica de guardado
      */
     private String procesarPersistenciaComunidad(Comunidad comunidadForm, Authentication auth, RedirectAttributes redirectAttributes, boolean esNueva) {
         Usuario actual = getUsuarioLogueado(auth);
         Comunidad comunidadAPersistir;
 
         if (!esNueva) {
-            // CARGAMOS LA COMUNIDAD REAL DE LA DB PARA NO PERDER LOS VECINOS
             comunidadAPersistir = comunidadRepository.findById(comunidadForm.getId())
                     .orElseThrow(() -> new RuntimeException("No existe la comunidad a actualizar"));
 
-            // Sincronizamos solo los campos del formulario
             comunidadAPersistir.setNombre(comunidadForm.getNombre());
             comunidadAPersistir.setDireccion(comunidadForm.getDireccion());
             comunidadAPersistir.setPoblacion(comunidadForm.getPoblacion());
@@ -159,7 +160,7 @@ public class ComunidadController {
             return esNueva ? "redirect:/comunidades/nueva" : "redirect:/comunidades/editar/" + comunidadForm.getId();
         }
 
-        // Guardado seguro
+        // Guardado usando el repositorio directamente (ya que no existe comunidadService)
         Comunidad guardada = comunidadRepository.save(comunidadAPersistir);
 
         if (esNueva) {
@@ -167,9 +168,11 @@ public class ComunidadController {
             contabilidadService.inicializarPlanContable(guardada);
         }
 
-        redirectAttributes.addFlashAttribute("mensaje", "Comunidad actualizada correctamente sin afectar a los vecinos.");
+        redirectAttributes.addFlashAttribute("mensaje", esNueva ? "Comunidad creada con éxito" : "Comunidad actualizada correctamente");
         return "redirect:/comunidades/lista";
     }
+
+    // --- FIN DE LA CORRECCIÓN ---
 
     private boolean validarCIF(String cif) {
         if (cif == null || cif.length() != 9) return false;
@@ -197,36 +200,25 @@ public class ComunidadController {
                                                @RequestParam("fechaVencimiento") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaVencimiento,
                                                Authentication auth) {
 
-        // 1. VALIDACIÓN DE LICENCIA (Bloqueo Funcional)
         if (!licenseService.validarLicencia()) {
-            log.warn("Descarga bloqueada: El equipo [{}] no dispone de licencia activa para generar SEPA.", licenseService.getEquipoID());
-
-            String mensajeInformativo = "SISTEMA NO ACTIVADO: La generación de ficheros de remesas Cuaderno 19 " +
-                    "está restringida a la versión con licencia. \n\n" +
-                    "ID de su equipo: " + licenseService.getEquipoID();
-
-            return ResponseEntity.status(402) // HTTP 402: Payment Required
-                    .contentType(MediaType.TEXT_PLAIN)
-                    .body(mensajeInformativo.getBytes(StandardCharsets.UTF_8));
+            log.warn("Descarga bloqueada: El equipo [{}] no dispone de licencia activa.", licenseService.getEquipoID());
+            String mensajeInformativo = "SISTEMA NO ACTIVADO. ID de su equipo: " + licenseService.getEquipoID();
+            return ResponseEntity.status(402).contentType(MediaType.TEXT_PLAIN).body(mensajeInformativo.getBytes(StandardCharsets.UTF_8));
         }
 
-        // 2. SEGURIDAD: Verificación de acceso del usuario a la comunidad
         Usuario actual = getUsuarioLogueado(auth);
         Comunidad comunidad = comunidadRepository.findById(id)
                 .filter(c -> c.getAdministrador().getId().equals(actual.getId()))
-                .orElseThrow(() -> new RuntimeException("Sin permisos o comunidad no encontrada"));
+                .orElseThrow(() -> new RuntimeException("Sin permisos"));
 
-        // 3. PROCESAMIENTO: Generación del contenido SEPA
         List<Vecino> vecinos = vecinoRepository.findByComunidad(comunidad);
         String contenido = sepaService.generarCuaderno19(comunidad, vecinos, fechaVencimiento);
 
-        // 4. CÁLCULOS: Resumen para el registro histórico
         BigDecimal totalRemesa = vecinos.stream()
                 .filter(Vecino::isDomiciliado)
                 .map(Vecino::getImporteTotalConceptos)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 5. PERSISTENCIA: Guardar copia en el historial de remesas generadas
         FicheroGenerado historico = new FicheroGenerado();
         historico.setComunidad(comunidad);
         historico.setIdentificadorFichero("REM-" + System.currentTimeMillis());
@@ -237,7 +229,6 @@ public class ComunidadController {
         historico.setContenido(contenido);
         ficheroRepository.save(historico);
 
-        // 6. RESPUESTA: Entrega del archivo al navegador
         byte[] data = contenido.getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)

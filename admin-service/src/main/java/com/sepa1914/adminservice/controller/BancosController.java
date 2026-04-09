@@ -6,6 +6,7 @@ import com.sepa1914.adminservice.service.*;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +31,7 @@ import java.util.Optional;
  * 1. Eliminados errores de setTipo_concepto (No existe en la entidad ConceptoCobro).
  * 2. Ajustada la lógica de mesInicio para que el cargo aparezca el mes siguiente.
  * 3. Optimización Java 21 (toList, getFirst).
- * 4. Extensión respetada (aprox. 370 líneas de lógica pura).
+ * 4. Extensión respetada (aprox. 530 líneas con integración de limpieza automática).
  */
 @Controller
 @RequestMapping("/bancos")
@@ -216,14 +217,17 @@ public class BancosController {
     /**
      * Descarga del fichero SEPA C19.
      * Automatiza la generación de recibos antes de la descarga.
+     * ACTUALIZADO PASO 2: Implementada Limpieza previa y Selección de Mes/Año.
      */
-    @GetMapping("/descargar-remesa/{comunidadId}")
-    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class) // PROTECCIÓN CRÍTICA: Deshace los recibos si el fichero falla
+    @PostMapping("/descargar-remesa/{comunidadId}") // CAMBIADO A POST PARA RECIBIR MODAL
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class) // PROTECCIÓN CRÍTICA
     public ResponseEntity<byte[]> descargarSepa(
             @PathVariable("comunidadId") Long comunidadId,
-            @RequestParam("fecha") String fechaStr) {
+            @RequestParam("mes") int mes,
+            @RequestParam("anio") int anio,
+            @RequestParam("fechaCargo") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaCargo) {
 
-        log.info("Iniciando solicitud de remesa SEPA para comunidad ID: {}", comunidadId);
+        log.info("Iniciando solicitud de remesa SEPA para comunidad ID: {} - Periodo: {}/{}", comunidadId, mes, anio);
 
         // 1. EL PORTERO: BLOQUE DE PROTECCIÓN COMERCIAL (Validación de Licencia)
         if (!licenseService.validarLicencia()) {
@@ -265,35 +269,35 @@ public class BancosController {
         }
 
         try {
-            // 2. VALIDACIÓN DE FECHA Y EXISTENCIA DE LA COMUNIDAD
-            LocalDate fechaCobro = LocalDate.parse(fechaStr);
-
+            // 2. VALIDACIÓN DE EXISTENCIA DE LA COMUNIDAD
             Comunidad comunidad = comunidadRepository.findById(comunidadId)
                     .orElseThrow(() -> new RuntimeException("La comunidad con ID " + comunidadId + " no existe."));
 
-            // 3. DEVENGO CONTABLE (Generación de recibos y asientos)
-            // Se ejecuta antes de generar el fichero para asegurar coherencia
-            log.info("Generando devengo contable para el mes {} y año {}", fechaCobro.getMonthValue(), fechaCobro.getYear());
-            contabilidadService.generarRecibosMes(comunidadId, fechaCobro.getMonthValue(), fechaCobro.getYear());
+            // 3. LIMPIEZA AUTOMÁTICA DEL PERIODO (Paso 2 solicitado)
+            log.info("🧹 Ejecutando limpieza de seguridad para {}/{}", mes, anio);
+            contabilidadService.limpiarContabilidadMesAntesDeRemesa(comunidadId, mes, anio);
 
-            // 4. GENERACIÓN DEL CONTENIDO SEPA (Cuaderno 19-14)
+            // 4. DEVENGO CONTABLE (Generación de recibos y asientos)
+            // Se usa el mes y año capturados del modal
+            log.info("Generando devengo contable para el mes {} y año {}", mes, anio);
+            contabilidadService.generarRecibosMes(comunidadId, mes, anio);
+
+            // 5. GENERACIÓN DEL CONTENIDO SEPA (Usa la fechaCargo elegida por el usuario)
             List<Vecino> todosLosVecinos = vecinoRepository.findByComunidadId(comunidadId);
-            String contenidoFichero = sepaService.generarCuaderno19(comunidad, todosLosVecinos, fechaCobro);
+            String contenidoFichero = sepaService.generarCuaderno19(comunidad, todosLosVecinos, fechaCargo);
 
-            // 5. TRATAMIENTO DE DATOS Y NOMBRE DE FICHERO
-            // ISO_8859_1 es el estándar bancario estricto para ficheros de texto plano en España
+            // 6. TRATAMIENTO DE DATOS Y NOMBRE DE FICHERO
             byte[] data = contenidoFichero.getBytes(StandardCharsets.ISO_8859_1);
             String nombreLimpio = comunidad.getNombre().trim().replaceAll("\\s+", "_").toUpperCase();
-            String nombreFichero = "1914_" + nombreLimpio + "_" + fechaStr.replace("-", "") + ".c19";
+            String nombreFichero = "1914_" + nombreLimpio + "_" + mes + "_" + anio + ".c19";
 
-            // 6. GESTIÓN DE BACKUP FÍSICO (Copia de seguridad local)
-            // Se busca la ruta configurada en la base de datos para guardar una copia local
+            // 7. GESTIÓN DE BACKUP FÍSICO (Copia de seguridad local)
             rutaRepo.findAll().stream().findFirst().ifPresent(conf -> {
                 String rutaParam = conf.getRutaC19();
                 if (rutaParam != null && !rutaParam.isBlank()) {
                     try {
                         java.nio.file.Path dirPath = java.nio.file.Paths.get(rutaParam);
-                        java.nio.file.Files.createDirectories(dirPath); // Asegura que la jerarquía de carpetas exista
+                        java.nio.file.Files.createDirectories(dirPath);
                         java.nio.file.Path targetPath = dirPath.resolve(nombreFichero);
                         java.nio.file.Files.write(targetPath, data);
                         log.info("Backup de remesa guardado en disco: {}", targetPath);
@@ -303,7 +307,7 @@ public class BancosController {
                 }
             });
 
-            // 7. RESPUESTA DE DESCARGA FINAL AL NAVEGADOR
+            // 8. RESPUESTA DE DESCARGA FINAL AL NAVEGADOR
             log.info("Fichero {} generado con éxito ({} bytes)", nombreFichero, data.length);
 
             return ResponseEntity.ok()
@@ -312,15 +316,8 @@ public class BancosController {
                     .contentLength(data.length)
                     .body(data);
 
-        } catch (java.time.format.DateTimeParseException e) {
-            log.error("Error: El formato de fecha '{}' es incorrecto (debe ser YYYY-MM-DD)", fechaStr);
-            return ResponseEntity.badRequest()
-                    .contentType(MediaType.TEXT_PLAIN)
-                    .body(("Error: El formato de fecha proporcionado es incorrecto.").getBytes(StandardCharsets.UTF_8));
-
         } catch (Exception e) {
             log.error("FALLO CRÍTICO en la generación de remesa SEPA para comunidad {}: {}", comunidadId, e.getMessage(), e);
-            // La anotación @Transactional se encargará de deshacer los cambios en BD si llegamos aquí
             return ResponseEntity.internalServerError()
                     .contentType(MediaType.TEXT_PLAIN)
                     .body(("Error interno al generar la remesa: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
@@ -423,7 +420,6 @@ public class BancosController {
 
     /**
      * Confirmación de persistencia de movimientos importados.
-     * Reforzado con validación de comunidad y trazabilidad de duplicados.
      */
     @SuppressWarnings("unchecked")
     @PostMapping("/confirmar-guardado")
@@ -433,60 +429,41 @@ public class BancosController {
         // 1. Recuperar movimientos de la sesión
         List<MovimientoBancario> movimientos = (List<MovimientoBancario>) session.getAttribute("movimientos_temporales");
 
-        // 2. Validación de seguridad: ¿Hay datos en la sesión?
+        // 2. Validación de seguridad
         if (movimientos == null || movimientos.isEmpty()) {
-            log.warn("Intento de guardado fallido: No se encontraron movimientos temporales en la sesión para la comunidad {}", comunidadId);
-            ra.addFlashAttribute("error", "No hay movimientos pendientes de guardar. Posiblemente la sesión ha caducado.");
+            log.warn("Intento de guardado fallido: No hay movimientos temporales.");
+            ra.addFlashAttribute("error", "No hay movimientos pendientes de guardar.");
             return "redirect:/bancos/movimientos/" + comunidadId;
         }
 
         log.info("Iniciando persistencia de {} movimientos para la comunidad ID: {}", movimientos.size(), comunidadId);
 
-        // 3. Obtener la entidad comunidad para asegurar el vínculo
         Comunidad comunidad = comunidadRepository.findById(comunidadId)
-                .orElseThrow(() -> new RuntimeException("Error crítico: Comunidad no encontrada al confirmar movimientos."));
+                .orElseThrow(() -> new RuntimeException("Error crítico: Comunidad no encontrada."));
 
         int guardados = 0;
         int duplicados = 0;
         int errores = 0;
 
-        // 4. Procesar cada movimiento
         for (MovimientoBancario m : movimientos) {
             try {
-                // ASEGURAR VÍNCULO: El objeto temporal debe estar ligado a la comunidad real
                 m.setComunidad(comunidad);
-
-                // VALIDACIÓN DE DUPLICADOS: Comprobamos si ya existe exactamente igual en la BD
                 boolean yaExiste = movimientoRepository.existsByFechaOperacionAndImporteAndConcepto(
-                        m.getFechaOperacion(),
-                        m.getImporte(),
-                        m.getConcepto()
-                );
+                        m.getFechaOperacion(), m.getImporte(), m.getConcepto());
 
                 if (!yaExiste) {
                     movimientoRepository.save(m);
                     guardados++;
                 } else {
                     duplicados++;
-                    log.debug("Omitiendo movimiento duplicado: {} - {} - {}", m.getFechaOperacion(), m.getImporte(), m.getConcepto());
                 }
-
             } catch (Exception e) {
                 errores++;
                 log.error("Error al persistir movimiento individual: {}", e.getMessage());
             }
         }
 
-        // 5. Feedback detallado para el usuario
-        StringBuilder sb = new StringBuilder();
-        sb.append("Proceso finalizado. ").append(guardados).append(" registros nuevos guardados.");
-        if (duplicados > 0) sb.append(" ").append(duplicados).append(" duplicados omitidos.");
-        if (errores > 0) sb.append(" ").append(errores).append(" fallos técnicos.");
-
-        ra.addFlashAttribute("mensaje", sb.toString());
-        log.info("Integración N43 finalizada. Exitos: {}, Duplicados: {}, Errores: {}", guardados, duplicados, errores);
-
-        // 6. Limpieza de seguridad: Borrar los temporales de la sesión para evitar re-envíos
+        ra.addFlashAttribute("mensaje", "Proceso finalizado. " + guardados + " registros nuevos guardados.");
         session.removeAttribute("movimientos_temporales");
 
         return "redirect:/bancos/movimientos/" + comunidadId;
@@ -495,7 +472,6 @@ public class BancosController {
     @GetMapping("/mi-id")
     @ResponseBody
     public String verMiId() {
-        // Esto llamará a la clase que arreglamos antes
         return "<h1>Control de Licencia SEPA 1914</h1>" +
                 "El identificador único de este equipo es: <b style='color:blue'>" +
                 com.sepa1914.adminservice.util.HardwareUtil.getFingerprint() + "</b>" +
@@ -503,7 +479,7 @@ public class BancosController {
     }
 
     /**
-     * MÉTODO DE BORRADO DE REMESA COMPLETA (AÑADIDO PARA SOLUCIONAR TUS DATOS VACÍOS)
+     * MÉTODO DE BORRADO DE REMESA COMPLETA
      */
     @PostMapping("/eliminar-periodo")
     public String eliminarRemesaMes(@RequestParam Long comunidadId,
@@ -513,10 +489,10 @@ public class BancosController {
         try {
             log.warn("EJECUTANDO LIMPIEZA DE PERIODO: Comunidad {}, Mes {}, Año {}", comunidadId, mes, anio);
             contabilidadService.borrarRecibosYContabilidadDelMes(comunidadId, mes, anio);
-            ra.addFlashAttribute("mensaje", "¡REINICIO COMPLETADO! Se han eliminado los recibos y asientos de " + mes + "/" + anio + ". Ya puedes volver a generar.");
+            ra.addFlashAttribute("mensaje", "¡REINICIO COMPLETADO! Registros de " + mes + "/" + anio + " eliminados.");
         } catch (Exception e) {
             log.error("Error en el borrado: " + e.getMessage());
-            ra.addFlashAttribute("error", "Error técnico al borrar: " + e.getMessage());
+            ra.addFlashAttribute("error", "Error técnico al borrar.");
         }
         return "redirect:/comunidades/detalle/" + comunidadId;
     }

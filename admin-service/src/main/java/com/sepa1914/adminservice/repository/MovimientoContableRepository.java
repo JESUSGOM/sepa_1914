@@ -1,6 +1,7 @@
 package com.sepa1914.adminservice.repository;
 
 import com.sepa1914.adminservice.model.MovimientoContable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -25,11 +27,13 @@ public interface MovimientoContableRepository extends JpaRepository<MovimientoCo
     /**
      * Obtiene todos los movimientos de una cuenta específica (Libro Mayor).
      */
+    @Query("SELECT m FROM MovimientoContable m JOIN FETCH m.cuenta WHERE m.cuenta.id = :cuentaId ORDER BY m.fecha ASC")
     List<MovimientoContable> findByCuentaIdOrderByFechaAsc(Long cuentaId);
 
     /**
      * Obtiene todos los movimientos de una comunidad para un rango de fechas.
      */
+    @Query("SELECT m FROM MovimientoContable m JOIN FETCH m.cuenta WHERE m.comunidad.id = :comunidadId ORDER BY m.fecha DESC")
     List<MovimientoContable> findByComunidadIdOrderByFechaDesc(Long comunidadId);
 
     /**
@@ -42,6 +46,7 @@ public interface MovimientoContableRepository extends JpaRepository<MovimientoCo
     /**
      * Obtiene todos los movimientos que componen un asiento completo.
      */
+    @Query("SELECT m FROM MovimientoContable m JOIN FETCH m.cuenta WHERE m.numeroAsiento = :numeroAsiento")
     List<MovimientoContable> findByNumeroAsiento(String numeroAsiento);
 
     /**
@@ -99,7 +104,7 @@ public interface MovimientoContableRepository extends JpaRepository<MovimientoCo
     /**
      * Obtiene los movimientos filtrados por año para el Libro Mayor.
      */
-    @Query("SELECT m FROM MovimientoContable m WHERE m.cuenta.id = :cuentaId AND YEAR(m.fecha) = :anio ORDER BY m.fecha ASC, m.id ASC")
+    @Query("SELECT m FROM MovimientoContable m JOIN FETCH m.cuenta WHERE m.cuenta.id = :cuentaId AND YEAR(m.fecha) = :anio ORDER BY m.fecha ASC, m.id ASC")
     List<MovimientoContable> findByCuentaIdAndAnioOrderByFechaAsc(@Param("cuentaId") Long cuentaId, @Param("anio") int anio);
 
     /**
@@ -118,12 +123,13 @@ public interface MovimientoContableRepository extends JpaRepository<MovimientoCo
     /**
      * Recupera todos los movimientos de una comunidad para un año específico (Libro Diario).
      */
-    @Query("SELECT m FROM MovimientoContable m WHERE m.comunidad.id = :comId AND YEAR(m.fecha) = :anio ORDER BY m.fecha DESC, m.id DESC")
+    @Query("SELECT m FROM MovimientoContable m JOIN FETCH m.cuenta WHERE m.comunidad.id = :comId AND YEAR(m.fecha) = :anio ORDER BY m.fecha DESC, m.id DESC")
     List<MovimientoContable> findByComunidadIdAndAnio(@Param("comId") Long comunidadId, @Param("anio") int anio);
 
     /**
-     * Paginación para el Libro Diario.
+     * Paginación para el Libro Diario (Optimizado GTI con EntityGraph).
      */
+    @EntityGraph(attributePaths = {"cuenta"})
     @Query("SELECT m FROM MovimientoContable m WHERE m.comunidad.id = :comunidadId AND YEAR(m.fecha) = :anio")
     Page<MovimientoContable> findByComunidadIdAndAnio(Long comunidadId, int anio, Pageable pageable);
 
@@ -131,8 +137,8 @@ public interface MovimientoContableRepository extends JpaRepository<MovimientoCo
      * Obtiene todos los movimientos de una comunidad en un año, ordenados cronológicamente
      * para el proceso de renumeración oficial de asientos (Cierre de Ejercicio).
      */
-    @Query("SELECT m FROM MovimientoContable m WHERE m.comunidad.id = :comunidadId AND YEAR(m.fecha) = :anio ORDER BY m.fecha ASC, m.id ASC")
-    List<MovimientoContable> findByComunidadIdAndAnioOrderByFechaAscIdAsc(@Param("comunidadId") Long comunidadId, @Param("anio") int anio);
+    @Query("SELECT m FROM MovimientoContable m JOIN FETCH m.cuenta WHERE m.comunidad.id = :comId AND YEAR(m.fecha) = :anio ORDER BY m.fecha ASC, m.id ASC")
+    List<MovimientoContable> findByComunidadIdAndAnioOrderByFechaAscIdAsc(@Param("comId") Long comunidadId, @Param("anio") int anio);
 
     List<MovimientoContable> findByNumeroAsientoLike(String patron);
 
@@ -140,4 +146,12 @@ public interface MovimientoContableRepository extends JpaRepository<MovimientoCo
     @Transactional
     @Query("DELETE FROM MovimientoContable m WHERE m.comunidad.id = :comunidadId AND m.numeroAsiento NOT LIKE 'APE-%'")
     void deleteByComunidadIdExceptApertura(@Param("comunidadId") Long comunidadId);
+
+    @Query("SELECT m.cuenta.id, SUM(m.debe), SUM(m.haber) FROM MovimientoContable m WHERE m.comunidad.id = :comId AND YEAR(m.fecha) = :anio GROUP BY m.cuenta.id")
+    List<Object[]> obtenerTodosLosSaldosAnuales(@Param("comId") Long comId, @Param("anio") int anio);
+
+    @Query("SELECT m.cuenta.id, SUM(m.debe), SUM(m.haber) FROM MovimientoContable m WHERE m.comunidad.id = :comId AND m.fecha >= :inicio AND m.fecha <= :fin GROUP BY m.cuenta.id")
+    List<Object[]> obtenerSaldosPorRango(@Param("comId") Long comId,
+                                         @Param("inicio") LocalDate inicio,
+                                         @Param("fin") LocalDate fin);
 }

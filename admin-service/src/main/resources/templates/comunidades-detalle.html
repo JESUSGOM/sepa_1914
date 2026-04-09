@@ -87,7 +87,8 @@
                                         <i class="bi bi-graph-up-arrow display-6 text-success mb-2"></i>
                                         <h5>Estado de Cuentas</h5>
                                         <p class="small text-muted">Balance de situación y resumen contable anual.</p>
-                                        <a th:href="@{/informes/estado-cuentas/{id}(id=${comunidad.id})}" target="_blank" class="btn btn-sm btn-outline-success w-100">
+                                        <!-- CORRECCIÓN RUTA SEGURA GTI -->
+                                        <a th:href="@{/contabilidad/balance/pdf/{id}(id=${comunidad.id})}" target="_blank" class="btn btn-sm btn-outline-success w-100">
                                             <i class="bi bi-download"></i> Ver PDF
                                         </a>
                                     </div>
@@ -97,7 +98,8 @@
                                         <i class="bi bi-person-lines-fill display-6 text-warning mb-2"></i>
                                         <h5>Liquidación Individual</h5>
                                         <p class="small text-muted">Extracto detallado de recibos por cada propietario.</p>
-                                        <a th:href="@{/informes/liquidacion-individual/{id}(id=${comunidad.id})}" target="_blank" class="btn btn-sm btn-outline-warning w-100">
+                                        <!-- CORRECCIÓN RUTA SEGURA GTI -->
+                                        <a th:href="@{/contabilidad/propietario/liquidacion/masiva/{id}(id=${comunidad.id})}" target="_blank" class="btn btn-sm btn-outline-warning w-100">
                                             <i class="bi bi-download"></i> Ver PDF Masivo
                                         </a>
                                     </div>
@@ -159,7 +161,8 @@
             <div class="modal fade" id="modalConvocatoriaDetalle" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content border-0 shadow">
-                        <form th:action="@{/informes/convocatoria/{id}(id=${comunidad.id})}" method="get" target="_blank">
+                        <!-- CORRECCIÓN RUTA SEGURA GTI Y target="_blank" -->
+                        <form th:action="@{/contabilidad/convocatoria/{id}(id=${comunidad.id})}" method="get" target="_blank">
                             <div class="modal-header bg-primary text-white">
                                 <h5 class="modal-title"><i class="bi bi-megaphone me-2"></i>Nueva Convocatoria</h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>

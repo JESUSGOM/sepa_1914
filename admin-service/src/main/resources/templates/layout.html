@@ -10,16 +10,23 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; }
 
-        /* Sidebar Estilo Negro Premium */
+        /* --- OPTIMIZACIÓN GTI: SIDEBAR CON SCROLL INDEPENDIENTE --- */
         .sidebar {
-            min-height: 100vh;
+            height: 100vh; /* Altura total de la ventana */
+            overflow-y: auto; /* Solo el menú hace scroll si el contenido excede la altura */
+            position: sticky;
+            top: 0;
             background-color: #212529 !important;
             color: white !important;
             box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 0;
             padding-bottom: 2rem;
+            z-index: 1000;
         }
+
+        /* Personalización del scrollbar del menú (Estilo F1) */
+        .sidebar::-webkit-scrollbar { width: 5px; }
+        .sidebar::-webkit-scrollbar-thumb { background: #495057; border-radius: 10px; }
+        .sidebar::-webkit-scrollbar-track { background: #212529; }
 
         .sidebar .nav-link {
             color: #adb5bd !important;
@@ -62,7 +69,6 @@
             margin-top: 20px;
         }
 
-        /* Estilo para el banner de licencia */
         .license-banner {
             background-color: #dc3545;
             color: white;
@@ -85,7 +91,7 @@
 <body>
 
 <div th:fragment="menu" class="col-md-3 col-lg-2 d-md-block sidebar collapse shadow">
-    <div class="position-sticky pt-3">
+    <div class="pt-3">
 
         <div th:if="${softwareActivado == false}" class="px-3">
             <div class="license-banner shadow-sm">
@@ -154,7 +160,6 @@
         </ul>
 
         <div th:if="${session.comunidadSeleccionada != null}">
-
             <div class="sidebar-heading mt-3">Tesorería Finca</div>
             <ul class="nav flex-column">
                 <li class="nav-item">
@@ -231,25 +236,25 @@
             <div class="sidebar-heading mt-3">Informes y Asamblea</div>
             <ul class="nav flex-column">
                 <li class="nav-item">
-                    <a class="nav-link text-white" th:href="@{/informes/convocatoria/{id}(id=${session.comunidadSeleccionada.id})}"
+                    <a class="nav-link text-white" th:href="@{/contabilidad/convocatoria/{id}(id=${session.comunidadSeleccionada.id})}"
                        th:classappend="${activePage == 'convocatoria' ? 'active' : ''}">
                         <i class="bi bi-megaphone"></i> Convocatoria Junta
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" th:href="@{/informes/estado-cuentas/{id}(id=${session.comunidadSeleccionada.id})}"
-                       th:classappend="${activePage == 'informe-cuentas' ? 'active' : ''}">
+                    <a class="nav-link text-white" th:href="@{/contabilidad/estado-cuentas/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'informe-cuentas' ? 'active' : ''}" target="_blank">
                         <i class="bi bi-file-earmark-pdf"></i> Estado de Cuentas
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" th:href="@{/informes/liquidacion-individual/{id}(id=${session.comunidadSeleccionada.id})}"
+                    <a class="nav-link text-white" th:href="@{/contabilidad/liquidacion-individual/seleccion/{id}(id=${session.comunidadSeleccionada.id})}"
                        th:classappend="${activePage == 'liquidacion-individual' ? 'active' : ''}">
                         <i class="bi bi-person-vcard"></i> Liquidación Propietario
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-white" th:href="@{/informes/certificado-deudas/{id}(id=${session.comunidadSeleccionada.id})}"
+                    <a class="nav-link text-white" th:href="@{/contabilidad/certificado-deudas/seleccion/{id}(id=${session.comunidadSeleccionada.id})}"
                        th:classappend="${activePage == 'certificados' ? 'active' : ''}">
                         <i class="bi bi-shield-check"></i> Certificado de Deudas
                     </a>

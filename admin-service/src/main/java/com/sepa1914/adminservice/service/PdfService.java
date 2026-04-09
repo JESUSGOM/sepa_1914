@@ -8,30 +8,46 @@ import com.sepa1914.adminservice.model.Comunidad;
 import com.sepa1914.adminservice.model.ConceptoCobro;
 import com.sepa1914.adminservice.model.Vecino;
 import com.sepa1914.adminservice.model.Recibo;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import org.xhtmlrenderer.pdf.ITextRenderer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.awt.Color;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.TextStyle;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
- * Servicio integral para la generación de documentos PDF.
- * MANTIENE TODA LA LÓGICA DE ITEXT Y FLYING SAUCER.
+ * SERVICIO MAESTRO DE GENERACIÓN PDF - SEPA 1914
+ * -----------------------------------------------------------------------------
+ * MOTOR: Flying Saucer (XHTML) + OpenPDF (iText heredado).
+ * OPTIMIZACIÓN GTI: Generación asíncrona de streaming para visualización web.
+ * SIN LOMBOK - JAVA PURO.
  */
 @Service
 public class PdfService {
+
+    private static final Logger log = LoggerFactory.getLogger(PdfService.class);
+
+    private static final Pattern DIACRITICS = Pattern.compile("[\\p{InCombiningDiacriticalMarks}]");
+    private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^A-Z0-9]");
 
     @Autowired
     private TemplateEngine templateEngine;
@@ -39,65 +55,122 @@ public class PdfService {
     @Value("${app.recibos.pdf.path}")
     private String pdfPath;
 
+    // =========================================================================
+    // 1. GENERACIÓN BASADA EN PLANTILLAS THYMELEAF (HTML TO PDF)
+    // =========================================================================
+
     /**
-     * Genera un recibo individual, lo guarda en el disco y devuelve la ruta.
-     * Utilizado por SepaService para el envío de correos.
+     * MÉTODO MAESTRO: Genera PDF y lo envía directamente al navegador.
+     * Sincronizado con ContabilidadController.
      */
-    public String generarReciboPdfLocal(Recibo recibo, String nombreFichero) {
+    public void generatePdf(String templateName, Map<String, Object> data, HttpServletResponse response, String fileName) {
+        log.info("GTI PDF_STREAM: Iniciando emisión de documento: {}", fileName);
+        try {
+            Context context = new Context();
+            context.setVariables(data);
+
+            // Procesar plantilla (se asume que están en /templates/pdf/)
+            String htmlContent = templateEngine.process(templateName, context);
+
+            // Optimización GTI: Bypass de DOCTYPE para evitar consultas externas lentas
+            htmlContent = htmlContent.replaceFirst("(?i)<!DOCTYPE[^>]*>", "");
+
+            response.setContentType("application/pdf");
+            response.setHeader("Content-Disposition", "inline; filename=\"" + fileName + "\"");
+
+            try (OutputStream os = response.getOutputStream()) {
+                ITextRenderer renderer = new ITextRenderer();
+                renderer.setDocumentFromString(htmlContent);
+                renderer.layout();
+                renderer.createPDF(os);
+                os.flush();
+            }
+            log.info("GTI PDF_STREAM: Envío finalizado correctamente.");
+        } catch (Exception e) {
+            log.error("ERROR CRÍTICO EN STREAM PDF: {}", e.getMessage());
+            throw new RuntimeException("Error al generar streaming de PDF: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Genera un recibo individual y lo guarda físicamente en el servidor.
+     */
+    public String generarReciboPdfLocal(Recibo recibo, String nombreFicheroSugerido) {
         try {
             File folder = new File(pdfPath);
-            if (!folder.exists()) folder.mkdirs();
+            if (!folder.exists() && folder.mkdirs()) {
+                log.info("Directorio de recibos creado en: {}", pdfPath);
+            }
+
+            String nombreMes = recibo.getFechaEmision().getMonth()
+                    .getDisplayName(TextStyle.FULL, new Locale("es", "ES"));
 
             Map<String, Object> data = new HashMap<>();
             data.put("recibo", recibo);
             data.put("comunidad", recibo.getComunidad());
             data.put("vecino", recibo.getVecino());
+            data.put("nombreMes", nombreMes);
+            data.put("ejercicio", recibo.getFechaEmision().getYear());
 
             byte[] pdfBytes = generarPdfDesdePlantilla("recibo-template", data);
 
-            // Limpieza de nombre de fichero para evitar errores de sistema operativo
-            String nombreLimpio = nombreFichero.replaceAll("[^a-zA-Z0-9.-]", "_");
-            String fullPath = pdfPath + nombreLimpio + ".pdf";
+            String cif = recibo.getComunidad().getIdentificadorAcreedor();
+            String vivienda = (recibo.getVecino().getVivienda() != null) ?
+                    recibo.getVecino().getVivienda().trim() : "SIN_VIV";
+            String nombreVecino = normalizarParaFichero(recibo.getVecino().getNombre());
 
-            try (FileOutputStream fos = new FileOutputStream(fullPath)) {
-                fos.write(pdfBytes);
+            String nombreFinal = String.format("%s_%s_%s_%02d_%d.pdf",
+                    cif, vivienda.replace(" ", "_"), nombreVecino,
+                    recibo.getFechaEmision().getMonthValue(), recibo.getFechaEmision().getYear());
+
+            String fullPath = pdfPath + (pdfPath.endsWith(File.separator) ? "" : File.separator) + nombreFinal;
+
+            try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(fullPath))) {
+                bos.write(pdfBytes);
             }
+
             return fullPath;
         } catch (Exception e) {
-            throw new RuntimeException("Error al guardar PDF en disco: " + e.getMessage());
+            log.error("FALLO RECIBO LOCAL: {}", e.getMessage());
+            throw new RuntimeException("Error en recibo local: " + e.getMessage());
         }
     }
 
     /**
-     * Genera un PDF a partir de una plantilla HTML de Thymeleaf.
+     * Motor base de conversión HTML -> Bytes[].
      */
     public byte[] generarPdfDesdePlantilla(String templateName, Map<String, Object> data) {
         try {
             Context context = new Context();
             context.setVariables(data);
 
+            // Buscamos en el subdirectorio pdf/
             String htmlContent = templateEngine.process("pdf/" + templateName, context);
+            htmlContent = htmlContent.replaceFirst("(?i)<!DOCTYPE[^>]*>", "");
 
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             ITextRenderer renderer = new ITextRenderer();
-
             renderer.setDocumentFromString(htmlContent);
             renderer.layout();
             renderer.createPDF(outputStream);
 
             return outputStream.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar PDF desde plantilla: " + e.getMessage(), e);
+            throw new RuntimeException("Error en motor Thymeleaf-to-PDF: " + e.getMessage(), e);
         }
     }
 
+    // =========================================================================
+    // 2. INFORMES TÉCNICOS (ITEXT / OPENPDF PURO)
+    // =========================================================================
+
     /**
-     * Informe de Vecinos con Importes (iText).
+     * Resumen de control de remesas bancarias.
+     * FIX: Corregida llamada a getDescripcion() de ConceptoCobro.
      */
     public byte[] generarResumenRemesa(Comunidad comunidad, List<Vecino> vecinos, String nombreFichero, BigDecimal totalRemesa) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Document document = new Document(PageSize.A4, 36, 36, 36, 36);
-
         try {
             PdfWriter.getInstance(document, out);
             document.open();
@@ -137,19 +210,19 @@ public class PdfService {
             }
 
             for (Vecino v : vecinos) {
-                String infoVecino = v.getNombre() + "\nRef: " + v.getVivienda();
-                table.addCell(new Phrase(infoVecino, fontTablaCuerpo));
-
+                table.addCell(new Phrase(v.getNombre() + "\nRef: " + v.getVivienda(), fontTablaCuerpo));
                 StringBuilder desglose = new StringBuilder();
                 for (ConceptoCobro c : v.getListaConceptos()) {
                     if (c.isActivo()) {
-                        desglose.append("- ").append(c.getDescripcion())
-                                .append(": ").append(String.format("%.2f", c.getImporte())).append("€\n");
+                        // FIX: Uso de getDescripcion() sincronizado con ConceptoCobro.java
+                        desglose.append("- ").append(c.getDescripcion()).append(": ")
+                                .append(String.format("%.2f", c.getImporte())).append("€\n");
                     }
                 }
                 table.addCell(new Phrase(desglose.length() > 0 ? desglose.toString() : "Sin conceptos", fontTablaCuerpo));
 
-                PdfPCell cellMonto = new PdfPCell(new Phrase(String.format("%.2f", v.getImporteTotalConceptos()) + " €", fontTablaCuerpo));
+                BigDecimal totalVecino = (v.getImporteTotalConceptos() != null) ? v.getImporteTotalConceptos() : BigDecimal.ZERO;
+                PdfPCell cellMonto = new PdfPCell(new Phrase(String.format("%.2f", totalVecino) + " €", fontTablaCuerpo));
                 cellMonto.setHorizontalAlignment(Element.ALIGN_RIGHT);
                 table.addCell(cellMonto);
             }
@@ -160,14 +233,15 @@ public class PdfService {
             document.add(pTotal);
 
             document.close();
+            return out.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar resumen", e);
+            throw new RuntimeException("Error en resumen remesa: " + e.getMessage());
         }
-        return out.toByteArray();
     }
 
     /**
-     * Informe de Domiciliaciones (Landscape - iText).
+     * Listado de domiciliaciones por comunidad (Apaisado).
+     * FIX: Corregida llamada a getDescripcion() de ConceptoCobro.
      */
     public byte[] generarInformeComunidades(List<Comunidad> comunidades, Map<Long, List<Vecino>> vecinosPorComunidad) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -175,12 +249,11 @@ public class PdfService {
         try {
             PdfWriter.getInstance(document, out);
             document.open();
-
             Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
             Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Font.NORMAL, Color.WHITE);
             Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 8);
 
-            Paragraph title = new Paragraph("LISTADO DE DOMICILIACIONES BANCARIAS POR COMUNIDAD", titleFont);
+            Paragraph title = new Paragraph("LISTADO DE DOMICILIACIONES BANCARIAS", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             title.setSpacingAfter(20);
             document.add(title);
@@ -195,26 +268,25 @@ public class PdfService {
                     PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
                     cell.setBackgroundColor(Color.BLACK);
                     cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-                    cell.setPadding(4);
                     table.addCell(cell);
                 }
 
-                List<Vecino> listaVecinos = vecinosPorComunidad.get(comunidad.getId());
-                if (listaVecinos != null) {
-                    for (Vecino v : listaVecinos) {
+                List<Vecino> lista = vecinosPorComunidad.get(comunidad.getId());
+                if (lista != null) {
+                    for (Vecino v : lista) {
                         table.addCell(new Phrase(v.getNombre(), bodyFont));
                         table.addCell(new Phrase(v.getVivienda(), bodyFont));
                         table.addCell(new Phrase(v.getIban() != null ? v.getIban() : "PENDIENTE", bodyFont));
 
                         StringBuilder sb = new StringBuilder();
                         for (ConceptoCobro c : v.getListaConceptos()) {
-                            if (c.isActivo()) {
-                                sb.append(c.getDescripcion()).append(" (").append(String.format("%.2f", c.getImporte())).append("€)\n");
-                            }
+                            // FIX: Uso de getDescripcion() sincronizado con ConceptoCobro.java
+                            if (c.isActivo()) sb.append(c.getDescripcion()).append(" (").append(c.getImporte()).append("€)\n");
                         }
                         table.addCell(new Phrase(sb.toString(), bodyFont));
 
-                        PdfPCell cTotal = new PdfPCell(new Phrase(String.format("%.2f", v.getImporteTotalConceptos()) + " €", bodyFont));
+                        BigDecimal totalV = (v.getImporteTotalConceptos() != null) ? v.getImporteTotalConceptos() : BigDecimal.ZERO;
+                        PdfPCell cTotal = new PdfPCell(new Phrase(totalV + " €", bodyFont));
                         cTotal.setHorizontalAlignment(Element.ALIGN_RIGHT);
                         table.addCell(cTotal);
                     }
@@ -223,14 +295,14 @@ public class PdfService {
                 document.add(new Paragraph("\n"));
             }
             document.close();
+            return out.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar listado", e);
+            throw new RuntimeException("Error en informe comunidades: " + e.getMessage());
         }
-        return out.toByteArray();
     }
 
     /**
-     * Genera la Orden de Mandato SEPA (iText).
+     * Orden de Mandato SEPA (CORE).
      */
     public byte[] generarMandatoSepa(Comunidad comunidad, Vecino vecino) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -238,7 +310,6 @@ public class PdfService {
         try {
             PdfWriter.getInstance(document, out);
             document.open();
-
             Font boldFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
             Font smallBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10);
             Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 10);
@@ -259,15 +330,19 @@ public class PdfService {
             document.add(new Paragraph("Vivienda: " + vecino.getVivienda(), normalFont));
             document.add(new Paragraph("IBAN: " + vecino.getIban(), normalFont));
 
-            document.add(new Paragraph("\nMediante la firma de esta orden de domiciliación, el deudor autoriza al acreedor a enviar instrucciones a la entidad del deudor para adeudar su cuenta...", normalFont));
+            document.add(new Paragraph("\nMediante la firma de esta orden de domiciliación, el deudor autoriza al acreedor a enviar instrucciones a su entidad...", normalFont));
             document.add(new Paragraph("\n\nFecha: _________________  Firma: ___________________________", normalFont));
 
             document.close();
+            return out.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar mandato", e);
+            throw new RuntimeException("Error en mandato SEPA: " + e.getMessage());
         }
-        return out.toByteArray();
     }
+
+    // =========================================================================
+    // 3. UTILIDADES PRIVADAS
+    // =========================================================================
 
     private void addInfoCell(PdfPTable table, String label, String value, Font fLabel, Font fValue) {
         PdfPCell cL = new PdfPCell(new Phrase(label, fLabel));
@@ -276,5 +351,13 @@ public class PdfService {
         PdfPCell cV = new PdfPCell(new Phrase(value != null ? value : "---", fValue));
         cV.setBorder(Rectangle.NO_BORDER);
         table.addCell(cV);
+    }
+
+    private String normalizarParaFichero(String texto) {
+        if (texto == null) return "VECINO";
+        String normalizado = java.text.Normalizer.normalize(texto, java.text.Normalizer.Form.NFD);
+        normalizado = DIACRITICS.matcher(normalizado).replaceAll("");
+        return NON_ALPHANUMERIC.matcher(normalizado.toUpperCase().replace("Ñ", "N"))
+                .replaceAll("_").replaceAll("_+", "_");
     }
 }

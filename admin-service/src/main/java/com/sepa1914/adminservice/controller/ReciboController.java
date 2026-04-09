@@ -121,8 +121,7 @@ public class ReciboController {
 
         // Implementación de paginación real (10 registros por página)
         PageRequest paginaRequest = PageRequest.of(page, 10);
-        Page<Recibo> paginaRecibos = reciboRepository.findByComunidadIdOrderByFechaEmisionDesc(
-                comunidadId, paginaRequest);
+        Page<Recibo> paginaRecibos = reciboRepository.findByComunidadIdOrderByFechaEmisionAsc(comunidadId, paginaRequest);
 
         model.addAttribute("comunidad", comunidad);
         model.addAttribute("recibos", paginaRecibos.getContent());

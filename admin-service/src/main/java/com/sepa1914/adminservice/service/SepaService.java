@@ -1,5 +1,6 @@
 package com.sepa1914.adminservice.service;
 
+import com.sepa1914.adminservice.model.Administrador;
 import com.sepa1914.adminservice.model.Comunidad;
 import com.sepa1914.adminservice.model.Vecino;
 import com.sepa1914.adminservice.model.ConceptoCobro;
@@ -16,12 +17,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.ArrayList;
 import java.text.Normalizer;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Servicio de Generación de Ficheros SEPA 19-14 (Norma 19-15 COR1).
- * REPARADO: Soporte total a no domiciliados y coincidencia de argumentos.
- * NUEVO: Generación de recibos PDF y envío automático por email a propietarios.
- * MANTIENE: Toda la lógica de persistencia contable y filtrado de periodos.
+ * ACTUALIZADO: Soporte Multi-Administrador y envío dinámico de emails.
  */
 @Service
 public class SepaService {
@@ -30,6 +31,10 @@ public class SepaService {
     private static final int LONGITUD_REGISTRO = 600;
     private static final String CODIGO_NORMA_1915 = "19154";
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    // Optimización GTI: Patrones pre-compilados para evitar latencia en bases gigantes
+    private static final Pattern DIACRITICS = Pattern.compile("[\\p{InCombiningDiacriticalMarks}]");
+    private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^A-Z0-9 ]");
 
     private final ContabilidadService contabilidadService;
     private final PdfService pdfService;
@@ -42,20 +47,21 @@ public class SepaService {
     }
 
     /**
-     * Genera el cuaderno bancario y registra los movimientos contables.
-     * @Transactional asegura la integridad entre el archivo generado y la base de datos.
+     * Proceso principal de generación de remesa, contabilidad, PDF y envío de emails.
      */
     @Transactional
     public String generarCuaderno19(Comunidad comunidad, List<Vecino> vecinos, LocalDate fechaCobro) {
-        log.info("### INICIANDO PROCESO SEPA 19-15: Comunidad '{}' - Fecha: {} ###", comunidad.getNombre(), fechaCobro);
+        log.info("🚀 INICIANDO REMESA MULTI-ADMIN: '{}' para el {}", comunidad.getNombre(), fechaCobro);
 
-        // 1. LIMPIEZA PREVIA
+        // 1. LIMPIEZA DE DATOS PREVIOS (Evita duplicados si se repite el proceso)
         contabilidadService.limpiarContabilidadMesAntesDeRemesa(
                 comunidad.getId(),
                 fechaCobro.getMonthValue(),
                 fechaCobro.getYear()
         );
 
+        // Datos de cabecera
+        Administrador admin = comunidad.getDatosAdministrador();
         String idAcreedor = comunidad.getIdentificadorAcreedor();
         String ibanComunidad = (comunidad.getIban() != null) ? comunidad.getIban().replace(" ", "") : "";
         String hoy = LocalDate.now().format(ISO_DATE);
@@ -69,7 +75,7 @@ public class SepaService {
         StringBuilder r01 = new StringBuilder();
         r01.append("01").append(CODIGO_NORMA_1915).append("001");
         r01.append(completar(idAcreedor, 35));
-        r01.append(completar(normalizarTexto(comunidad.getNombre()), 40));
+        r01.append(completar(comunidad.getNombre(), 40));
         r01.append(completar("", 20)).append(hoy);
         sb.append(completarRegistro(r01.toString())).append("\n");
 
@@ -77,69 +83,69 @@ public class SepaService {
         StringBuilder r02 = new StringBuilder();
         r02.append("02").append(CODIGO_NORMA_1915).append("002");
         r02.append(completar(idAcreedor, 35)).append(fCobro);
-        r02.append(completar(normalizarTexto(comunidad.getNombre()), 40));
-        r02.append(completar(normalizarTexto(comunidad.getDireccion()), 40));
-        r02.append(completar(normalizarTexto(comunidad.getPoblacion()), 40));
+        r02.append(completar(comunidad.getNombre(), 40));
+        r02.append(completar(comunidad.getDireccion(), 40));
+        r02.append(completar(comunidad.getPoblacion(), 40));
         r02.append(completar(comunidad.getCodigoPostal(), 10));
         r02.append(completar(ibanComunidad, 34));
         sb.append(completarRegistro(r02.toString())).append("\n");
 
-        // --- 3. PROCESAMIENTO DE RECIBOS Y ADEUDOS ---
+        // --- 3. PROCESAMIENTO INDIVIDUAL DE VECINOS ---
         BigDecimal totalRemesaAcumuladoBancario = BigDecimal.ZERO;
         int numRecibosEnFichero = 0;
-        int numRecibosContablesTotales = 0;
 
         for (Vecino v : vecinos) {
             if (v == null || !v.isActivo()) continue;
 
-            List<ConceptoCobro> conceptosAptos = filtrarConceptosPorPeriodo(v, mesRemesa);
+            try {
+                List<ConceptoCobro> conceptosAptos = filtrarConceptosPorPeriodo(v, mesRemesa);
+                BigDecimal totalVecino = conceptosAptos.stream()
+                        .map(ConceptoCobro::getImporte)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            BigDecimal totalVecino = conceptosAptos.stream()
-                    .map(ConceptoCobro::getImporte)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (totalVecino.compareTo(BigDecimal.ZERO) > 0) {
+                    String conceptoDetallado = generarTextoConcepto(v, conceptosAptos);
 
-            if (totalVecino.compareTo(BigDecimal.ZERO) > 0) {
-                String conceptoDetallado = generarTextoConcepto(v, conceptosAptos);
+                    // A. Contabilidad
+                    Recibo reciboGenerado = contabilidadService.registrarDevengoCuota(v, totalVecino, conceptoDetallado, fechaCobro);
 
-                // --- A. PERSISTENCIA SIEMPRE (DOMICILIADO O NO) ---
-                // REPARADO: Se obtiene el objeto Recibo para poder generar el PDF
-                Recibo reciboGenerado = contabilidadService.registrarDevengoCuota(v, totalVecino, conceptoDetallado, fechaCobro);
-                numRecibosContablesTotales++;
+                    // B. PDF (Nombre de fichero único por vecino y periodo)
+                    String nombreFicheroPdf = v.getNif() + "_" + v.getVivienda() + "_" + mesRemesa + "_" + anioRemesa;
+                    String rutaPdf = pdfService.generarReciboPdfLocal(reciboGenerado, nombreFicheroPdf);
 
-                // --- NUEVO: GENERACIÓN DE PDF ---
-                // Nombre: NIF + Recibo Emitido a su cargo + Mes + Año
-                String nombreFicheroPdf = idAcreedor + " Recibo Emitido a su cargo " + mesRemesa + " " + anioRemesa;
-                String rutaPdf = pdfService.generarReciboPdfLocal(reciboGenerado, nombreFicheroPdf);
+                    // C. Email Dinámico (Usando el servidor SMTP del Administrador)
+                    if (v.getEmail() != null && !v.getEmail().isBlank()) {
+                        String asunto = "Recibo " + comunidad.getNombre() + " - " + mesRemesa + "/" + anioRemesa;
+                        String cuerpo = "Estimado/a " + v.getNombre() + ",\n\n" +
+                                "Le adjuntamos el recibo de su cuota de comunidad correspondiente al mes " + mesRemesa + ".\n\n" +
+                                "Saludos,\n" + comunidad.getNombre();
 
-                // --- NUEVO: ENVÍO POR EMAIL ---
-                if (v.getEmail() != null && !v.getEmail().trim().isEmpty()) {
-                    emailService.enviarReciboPorEmail(v, reciboGenerado, rutaPdf);
+                        emailService.enviarReciboPorEmail(v.getEmail(), asunto, cuerpo, rutaPdf, admin);
+                    }
+
+                    // D. Inclusión en Cuaderno 19 (Solo si está domiciliado)
+                    if (v.isDomiciliado() && v.getIban() != null && !v.getIban().isBlank()) {
+                        numRecibosEnFichero++;
+                        totalRemesaAcumuladoBancario = totalRemesaAcumuladoBancario.add(totalVecino);
+
+                        StringBuilder r03 = new StringBuilder();
+                        r03.append("03").append(CODIGO_NORMA_1915).append("003");
+                        r03.append(completar(idAcreedor, 35));
+                        r03.append(completar(v.getReferenciaMandato(), 35));
+                        r03.append("RCUR").append("A");
+                        r03.append(formatearImporte(totalVecino, 11));
+                        r03.append("20240101");
+                        r03.append(completar(v.getBic(), 11));
+                        r03.append(completar(v.getNombre(), 40));
+                        r03.append(completar("", 40));
+                        r03.append(completar(v.getIban().replace(" ", ""), 34));
+                        r03.append(completar(conceptoDetallado, 140));
+
+                        sb.append(completarRegistro(r03.toString())).append("\n");
+                    }
                 }
-
-                // --- B. ADICIÓN AL FICHERO BANCARIO (SOLO SI ES DOMICILIADO Y TIENE IBAN) ---
-                boolean tieneIbanValido = (v.getIban() != null && !v.getIban().trim().isEmpty());
-
-                if (v.isDomiciliado() && tieneIbanValido) {
-                    numRecibosEnFichero++;
-                    totalRemesaAcumuladoBancario = totalRemesaAcumuladoBancario.add(totalVecino);
-
-                    StringBuilder r03 = new StringBuilder();
-                    r03.append("03").append(CODIGO_NORMA_1915).append("003");
-                    r03.append(completar(idAcreedor, 35));
-                    r03.append(completar(v.getReferenciaMandato(), 35));
-                    r03.append("RCUR").append("A");
-                    r03.append(formatearImporte(totalVecino, 11));
-                    r03.append("20240101");
-                    r03.append(completar(v.getBic(), 11));
-                    r03.append(completar(normalizarTexto(v.getNombre()), 40));
-                    r03.append(completar("", 40));
-                    r03.append(completar(v.getIban().replace(" ", ""), 34));
-                    r03.append(completar(conceptoDetallado, 140));
-
-                    sb.append(completarRegistro(r03.toString())).append("\n");
-                } else {
-                    log.info("Vecino {} procesado contablemente y PDF generado, pero omitido de remesa SEPA.", v.getNombre());
-                }
+            } catch (Exception e) {
+                log.error("⚠️ Error procesando al vecino {}: {}", v.getNombre(), e.getMessage());
             }
         }
 
@@ -148,36 +154,35 @@ public class SepaService {
         r04.append("04").append(CODIGO_NORMA_1915).append("004");
         r04.append(completar(idAcreedor, 35)).append(fCobro);
         r04.append(formatearImporte(totalRemesaAcumuladoBancario, 17));
-        r04.append(String.format("%08d", numRecibosEnFichero));
-        r04.append(String.format("%010d", numRecibosEnFichero + 3));
+        r04.append(padLeft(String.valueOf(numRecibosEnFichero), 8, '0'));
+        r04.append(padLeft(String.valueOf(numRecibosEnFichero + 3), 10, '0'));
         sb.append(completarRegistro(r04.toString())).append("\n");
 
+        log.info("✅ REMESA FINALIZADA: {} recibos bancarios, Total: {} €", numRecibosEnFichero, totalRemesaAcumuladoBancario);
         return sb.toString();
     }
 
-    // =========================================================================
-    // MÉTODOS AUXILIARES (MANTENIDOS ÍNTEGROS)
-    // =========================================================================
+    // --- MÉTODOS AUXILIARES ---
 
     private String generarTextoConcepto(Vecino v, List<ConceptoCobro> conceptos) {
-        StringBuilder sb = new StringBuilder();
+        String descripcionUnida = conceptos.stream()
+                .map(ConceptoCobro::getDescripcion)
+                .collect(Collectors.joining(" / "));
+
         String finca = (v.getVivienda() != null) ? v.getVivienda() : "";
-        sb.append("CUOTA COMUNIDAD ").append(finca).append(": ");
-        for (int i = 0; i < conceptos.size(); i++) {
-            sb.append(conceptos.get(i).getDescripcion());
-            if (i < conceptos.size() - 1) sb.append(" / ");
-        }
-        String res = sb.toString().trim();
+        String res = ("CUOTA COMUNIDAD " + finca + ": " + descripcionUnida).trim();
         return res.length() > 140 ? res.substring(0, 140) : res;
     }
 
     private List<ConceptoCobro> filtrarConceptosPorPeriodo(Vecino v, int mesRemesa) {
         List<ConceptoCobro> aptos = new ArrayList<>();
         if (v.getListaConceptos() == null) return aptos;
+
         for (ConceptoCobro cc : v.getListaConceptos()) {
             if (cc != null && cc.isActivo() && cc.getImporte() != null && cc.getImporte().compareTo(BigDecimal.ZERO) > 0) {
                 String p = (cc.getPeriodicidad() != null) ? cc.getPeriodicidad().toString() : "MENSUAL";
                 int inicio = (cc.getMesInicio() != null) ? cc.getMesInicio() : 1;
+
                 boolean corresponde = switch (p) {
                     case "BIMESTRAL" -> (mesRemesa - inicio) % 2 == 0;
                     case "TRIMESTRAL" -> (mesRemesa - inicio) % 3 == 0;
@@ -193,25 +198,38 @@ public class SepaService {
     }
 
     private String completarRegistro(String contenido) {
-        return String.format("%-600s", contenido);
+        if (contenido.length() >= LONGITUD_REGISTRO) return contenido.substring(0, LONGITUD_REGISTRO);
+        StringBuilder res = new StringBuilder(contenido);
+        while (res.length() < LONGITUD_REGISTRO) res.append(" ");
+        return res.toString();
     }
 
     private String normalizarTexto(String texto) {
         if (texto == null) return "";
         String temp = Normalizer.normalize(texto, Normalizer.Form.NFD);
-        temp = temp.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "");
-        return temp.toUpperCase().replace("Ñ", "N").trim();
+        temp = DIACRITICS.matcher(temp).replaceAll("");
+        return NON_ALPHANUMERIC.matcher(temp.toUpperCase().replace("Ñ", "N")).replaceAll("").trim();
     }
 
     private String completar(String texto, int longitud) {
-        if (texto == null) texto = "";
-        String res = texto.trim().toUpperCase();
-        return res.length() > longitud ? res.substring(0, longitud) : String.format("%-" + longitud + "s", res);
+        String res = normalizarTexto(texto);
+        if (res.length() >= longitud) return res.substring(0, longitud);
+        StringBuilder sb = new StringBuilder(res);
+        while (sb.length() < longitud) sb.append(" ");
+        return sb.toString();
     }
 
     private String formatearImporte(BigDecimal importe, int longitud) {
         if (importe == null) importe = BigDecimal.ZERO;
         long centimos = importe.multiply(new BigDecimal("100")).setScale(0, RoundingMode.HALF_UP).longValue();
-        return String.format("%0" + longitud + "d", centimos);
+        return padLeft(String.valueOf(centimos), longitud, '0');
+    }
+
+    private String padLeft(String s, int n, char c) {
+        if (s.length() >= n) return s.substring(s.length() - n);
+        StringBuilder sb = new StringBuilder();
+        while (sb.length() < (n - s.length())) sb.append(c);
+        sb.append(s);
+        return sb.toString();
     }
 }

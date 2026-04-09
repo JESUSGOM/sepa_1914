@@ -6,11 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entidad Vecino refactorizada para soportar:
- * 1. Gestión de domiciliación y comunicación digital.
- * 2. Tres líneas de contacto telefónico.
- * 3. Cálculo dinámico de importes basados en conceptos activos.
- * 4. Gestión de coeficientes de participación y estados.
+ * Entidad Vecino (Propiedad).
+ * Representa a un propietario y su unidad (vivienda/local).
+ * MANTIENE: Gestión SEPA, comunicación digital, contabilidad y multitélefono.
  */
 @Entity
 @Table(name = "vecinos")
@@ -20,7 +18,7 @@ public class Vecino {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 70)
+    @Column(nullable = false, length = 100)
     private String nombre;
 
     @Column(length = 20)
@@ -32,47 +30,51 @@ public class Vecino {
     @Column(length = 20)
     private String telefono_3;
 
-    @Column(length = 100)
+    @Column(length = 150)
     private String email;
 
-    @Column(name = "nif", nullable = false)
+    @Column(name = "nif", nullable = false, length = 20)
     private String nif;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private String vivienda;
 
-    @Column(precision = 10, scale = 4)
-    private BigDecimal coeficiente;
-
-    @Column(name = "piso_porton")
+    @Column(name = "piso_porton", length = 50)
     private String pisoPorton;
 
-    @Column(name = "direccion_notificacion")
+    @Column(precision = 10, scale = 4)
+    private BigDecimal coeficiente = BigDecimal.ZERO;
+
+    @Column(name = "direccion_notificacion", length = 200)
     private String direccionNotificacion;
 
-    @Column(nullable = true)
+    @Column(length = 34)
     private String iban;
 
+    @Column(length = 11)
     private String bic;
 
     @Column(name = "referencia_mandato", length = 35)
     private String referenciaMandato;
 
-    @Column(name = "ruta_mandato_firmado")
+    @Column(name = "ruta_mandato_firmado", length = 255)
     private String rutaMandatoFirmado;
 
-    @Column(name = "cuenta_contable")
+    @Column(name = "cuenta_contable", length = 15)
     private String cuentaContable;
 
+    // LÓGICA DE ESTADOS (Mantenemos boolean primitivo para evitar nulos accidentales)
     @Column(nullable = false)
     private boolean domiciliado = true;
 
-    @Column(name = "envio_digital")
+    @Column(name = "envio_digital", nullable = false)
     private boolean envioDigital = true;
 
+    @Column(nullable = false)
     private boolean activo = true;
 
     @Lob
+    @Column(columnDefinition = "TEXT")
     private String notas;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -82,19 +84,20 @@ public class Vecino {
     @OneToMany(mappedBy = "vecino", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ConceptoCobro> listaConceptos = new ArrayList<>();
 
+    // Constructor vacío requerido por JPA
     public Vecino() {}
 
-    // --- MÉTODOS DE CÁLCULO (Mantenidos y Optimizados) ---
+    // --- MÉTODOS DE CÁLCULO ---
 
     /**
-     * Calcula la cuota mensual sumando solo los conceptos marcados como activos.
+     * Calcula el importe total sumando los conceptos de cobro activos del vecino.
      */
     public BigDecimal getImporteTotalConceptos() {
         if (listaConceptos == null || listaConceptos.isEmpty()) return BigDecimal.ZERO;
         return listaConceptos.stream()
                 .filter(ConceptoCobro::isActivo)
                 .map(ConceptoCobro::getImporte)
-                .filter(imp -> imp != null)
+                .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -102,11 +105,9 @@ public class Vecino {
         return listaConceptos;
     }
 
-    // --- MÉTODOS DE COMPATIBILIDAD ---
+    // --- MÉTODOS DE COMPATIBILIDAD (LEGACY) ---
     public void setDni(String dni) { this.nif = dni; }
     public String getDni() { return nif; }
-    public void setNif(String nif) { this.nif = nif; }
-    public String getNif() { return nif; }
 
     // --- GETTERS Y SETTERS ---
 
@@ -128,14 +129,17 @@ public class Vecino {
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
+    public String getNif() { return nif; }
+    public void setNif(String nif) { this.nif = nif; }
+
     public String getVivienda() { return vivienda; }
     public void setVivienda(String vivienda) { this.vivienda = vivienda; }
 
-    public BigDecimal getCoeficiente() { return coeficiente; }
-    public void setCoeficiente(BigDecimal coeficiente) { this.coeficiente = coeficiente; }
-
     public String getPisoPorton() { return pisoPorton; }
     public void setPisoPorton(String pisoPorton) { this.pisoPorton = pisoPorton; }
+
+    public BigDecimal getCoeficiente() { return coeficiente; }
+    public void setCoeficiente(BigDecimal coeficiente) { this.coeficiente = coeficiente; }
 
     public String getDireccionNotificacion() { return direccionNotificacion; }
     public void setDireccionNotificacion(String direccionNotificacion) { this.direccionNotificacion = direccionNotificacion; }

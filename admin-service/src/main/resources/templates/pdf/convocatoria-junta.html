@@ -6,12 +6,12 @@
         @page { size: A4; margin: 2cm; }
         body { font-family: Arial, sans-serif; line-height: 1.6; font-size: 11pt; color: #333; }
         .page-break { page-break-after: always; }
-        .header { text-align: center; border-bottom: 2px solid #0d6efd; margin-bottom: 20px; }
+        .header { text-align: center; border-bottom: 2px solid #0d6efd; margin-bottom: 20px; padding-bottom: 10px; }
         .comunidad-nombre { font-size: 14pt; font-weight: bold; text-transform: uppercase; color: #0d6efd; }
         .destinatario-box { margin: 30px 0; padding: 15px; border: 1px solid #ddd; width: 50%; float: right; background-color: #f9f9f9; }
         .clear { clear: both; }
         .seccion-cita { background-color: #f8f9fa; border-left: 5px solid #0d6efd; padding: 15px; margin: 20px 0; }
-        .signature-box { margin-top: 50px; text-align: center; width: 250px; float: right; }
+        .signature-box { margin-top: 50px; text-align: right; width: 100%; }
     </style>
 </head>
 <body>
@@ -20,7 +20,7 @@
 
     <div class="header">
         <div class="comunidad-nombre" th:text="${comunidad.nombre}">COMUNIDAD</div>
-        <div style="font-weight: bold;">CONVOCATORIA JUNTA GENERAL ORDINARIA [[${anio}]]</div>
+        <div style="font-weight: bold;">CONVOCATORIA JUNTA GENERAL ORDINARIA <span th:text="${anio}">2026</span></div>
     </div>
 
     <div class="destinatario-box">
@@ -34,12 +34,12 @@
     <p>
         Por la presente, se le convoca a la <strong>Junta General Ordinaria</strong> que se celebrará en
         <span th:text="${lugarJunta}" style="font-weight: bold;">LUGAR</span>, el próximo día
-        <span th:text="${fechaJunta}" style="font-weight: bold;">FECHA</span>, con el siguiente horario:
+        <span th:text="${fechaJunta}" style="font-weight: bold;">FECHA</span>.
     </p>
 
     <div class="seccion-cita">
-        <strong>1ª Convocatoria:</strong> [[${hora1}]] horas.<br/>
-        <strong>2ª Convocatoria:</strong> [[${hora2}]] horas (en caso de no haber quorum).
+        <strong>Horario:</strong> <span th:text="${hora1}">19:00</span>
+        <span th:if="${hora2 != null and hora2 != ''}"> / <span th:text="${hora2}">19:30</span></span>
     </div>
 
     <p style="text-decoration: underline; font-weight: bold;">ORDEN DEL DÍA:</p>
@@ -53,9 +53,9 @@
 
     <div class="signature-box">
         <p>En <span th:text="${comunidad.poblacion}">POBLACIÓN</span>, a <span th:text="${fechaActual}">FECHA</span></p>
-        <div style="border-top: 1px solid #000; padding-top: 5px; margin-top: 40px;">
-            <strong>El Secretario-Administrador</strong>
-        </div>
+        <br/>
+        <strong>Fdo: <span th:text="${nombreAdministrador}">Administrador</span></strong><br/>
+        <span>El Secretario-Administrador</span>
     </div>
 </div>
 

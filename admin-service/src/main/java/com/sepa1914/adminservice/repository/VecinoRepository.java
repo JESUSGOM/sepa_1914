@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.util.Optional;
 
 @Repository
 public interface VecinoRepository extends JpaRepository<Vecino, Long> {
@@ -24,4 +25,10 @@ public interface VecinoRepository extends JpaRepository<Vecino, Long> {
     Page<Vecino> findByComunidad(Comunidad comunidad, Pageable pageable);
 
     List<Vecino> findByComunidadId(Long comunidadId);
+
+    /**
+     * Búsqueda segura: Solo devuelve el vecino si pertenece al administrador logueado.
+     */
+    @Query("SELECT v FROM Vecino v WHERE v.id = :id AND v.comunidad.administrador.username = :username")
+    Optional<Vecino> findByIdAndAdminUsername(@Param("id") Long id, @Param("username") String username);
 }

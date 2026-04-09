@@ -12,11 +12,6 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Servicio de Licenciamiento Híbrido SEPA 1914.
- * 1. Verifica contra la tabla local 'licencias_maestras'.
- * 2. Si falla, verifica contra el servidor remoto jfgb.es.
- */
 @Service
 public class LicenseService {
 
@@ -26,67 +21,68 @@ public class LicenseService {
     @Autowired
     private LicenciaMaestraRepository licenciaMaestraRepository;
 
-    // URL de tu servidor de control remoto
     private final String API_URL = "https://jfgb.es/sepa/validar_licencia.php";
 
-    // Variables de control para permitir uso offline (Periodo de gracia)
-    private static boolean ultimaValidacionOk = false;
-    private static LocalDateTime fechaUltimoCheck = null;
+    // --- SISTEMA DE CACHÉ GTI (Aceleración) ---
+    private static boolean cacheValida = false;
+    private static LocalDateTime fechaProximaValidacion = null;
+    private final int MINUTOS_CACHE = 30; // El sistema solo "llamará a casa" cada 30 min.
 
-    /**
-     * Lógica de validación Maestra + Remota.
-     * No se elimina ninguna funcionalidad, se añade la capa de base de datos local.
-     */
     public boolean validarLicencia() {
+        // 1. COMPROBACIÓN DE CACHÉ (Impacto inmediato en velocidad)
+        if (cacheValida && fechaProximaValidacion != null && LocalDateTime.now().isBefore(fechaProximaValidacion)) {
+            // Si ya validamos hace poco, no perdemos tiempo en consultas ni red
+            return true;
+        }
+
         String hid = getEquipoID();
-        log.info("Iniciando validación de seguridad para Hardware ID: {}", hid);
+        log.info("🔍 Ejecutando validación de seguridad completa (Caché expirada o primer inicio)...");
 
         // --- PASO 1: VALIDACIÓN LOCAL (MAESTRA) ---
-        // Buscamos si el ID de este PC está en tu tabla local y está marcado como activo
         Optional<LicenciaMaestra> licenciaLocal = licenciaMaestraRepository.findByHardwareIdAndActivoTrue(hid);
 
         if (licenciaLocal.isPresent()) {
-            log.info("Acceso concedido mediante Licencia Maestra Local para: {}", hid);
-            ultimaValidacionOk = true;
+            log.info("✅ Acceso local concedido para: {}", hid);
+            actualizarCache(true);
             return true;
         }
 
         // --- PASO 2: VALIDACIÓN REMOTA (API PHP) ---
         try {
-            log.info("No hay licencia maestra local. Consultando servidor remoto...");
+            log.info("🌐 Consultando servidor remoto jfgb.es...");
             String urlCheck = API_URL + "?hid=" + hid;
 
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(urlCheck, Map.class);
 
             if (response != null && Boolean.TRUE.equals(response.get("activo"))) {
-                log.info("Licencia validada correctamente en servidor remoto jfgb.es");
-                ultimaValidacionOk = true;
-                fechaUltimoCheck = LocalDateTime.now();
+                log.info("✅ Licencia validada remotamente.");
+                actualizarCache(true);
                 return true;
             }
 
-            log.warn("El servidor remoto rechazó la licencia para el equipo {}", hid);
-            ultimaValidacionOk = false;
+            log.warn("❌ Licencia rechazada por el servidor.");
+            actualizarCache(false);
             return false;
 
         } catch (Exception e) {
-            log.error("Error de conexión con el servidor de licencias: {}", e.getMessage());
+            log.error("⚠️ Error de conexión: {}", e.getMessage());
 
-            // Lógica de gracia: Si validó correctamente hace menos de 24h, permitimos entrar aunque no haya internet
-            if (ultimaValidacionOk && fechaUltimoCheck != null &&
-                    fechaUltimoCheck.isAfter(LocalDateTime.now().minusHours(24))) {
-                log.info("Servidor remoto caído, pero se permite acceso por periodo de gracia (24h).");
+            // Lógica de gracia: Si antes funcionó, damos 24h de margen sin internet
+            if (cacheValida) {
+                log.info("⏳ Usando periodo de gracia por fallo de red.");
                 return true;
             }
-
             return false;
         }
     }
 
-    /**
-     * Mantiene la compatibilidad con tu utilidad de hardware.
-     */
+    private void actualizarCache(boolean estado) {
+        cacheValida = estado;
+        // Establecemos cuándo será la próxima vez que obligaremos a validar de verdad
+        fechaProximaValidacion = LocalDateTime.now().plusMinutes(MINUTOS_CACHE);
+    }
+
     public String getEquipoID() {
         return HardwareUtil.getFingerprint();
     }

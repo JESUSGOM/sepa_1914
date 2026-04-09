@@ -3,69 +3,99 @@
 <head th:replace="~{layout :: head}">
     <title>Panel de Control - SEPA 1914</title>
 </head>
-<body>
+<body class="bg-light">
 <div class="container-fluid">
     <div class="row">
         <div th:replace="~{layout :: menu}"></div>
 
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2">Panel de Control</h1>
-                <div class="text-muted small">
-                    Administrador: <span class="fw-bold text-dark" th:text="${#authentication.name}">Usuario</span>
+            <!-- Cabecera de Bienvenida -->
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
+                <h1 class="h2 fw-bold text-dark"><i class="bi bi-speedometer2 text-primary me-2"></i>Panel de Control</h1>
+                <div class="badge bg-white text-dark border shadow-sm p-2 px-3">
+                    <i class="bi bi-person-circle text-primary me-2"></i>
+                    Administrador: <span class="fw-bold" th:text="${#authentication.name}">Usuario</span>
                 </div>
             </div>
 
-            <div class="row mt-4">
+            <!-- Fila de KPIs (Key Performance Indicators) -->
+            <div class="row g-4 mb-5">
                 <div class="col-md-3">
-                    <div class="card text-white bg-primary mb-3 shadow border-0">
+                    <div class="card border-0 shadow-sm border-start border-primary border-4 h-100">
                         <div class="card-body">
-                            <h5 class="card-title opacity-75">Comunidades</h5>
-                            <p class="card-text h2" th:text="${totalComunidades}">0</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted small text-uppercase fw-bold mb-1">Comunidades</h6>
+                                    <h2 class="mb-0 fw-bold" th:text="${totalComunidades}">0</h2>
+                                </div>
+                                <div class="bg-primary bg-opacity-10 p-3 rounded-circle"><i class="bi bi-buildings fs-3 text-primary"></i></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-md-3">
-                    <div class="card text-white bg-success mb-3 shadow border-0">
+                    <div class="card border-0 shadow-sm border-start border-success border-4 h-100">
                         <div class="card-body">
-                            <h5 class="card-title opacity-75">Propietarios Totales</h5>
-                            <p class="card-text h2" th:text="${totalVecinos}">0</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted small text-uppercase fw-bold mb-1">Propietarios</h6>
+                                    <h2 class="mb-0 fw-bold" th:text="${totalVecinos}">0</h2>
+                                </div>
+                                <div class="bg-success bg-opacity-10 p-3 rounded-circle"><i class="bi bi-people fs-3 text-success"></i></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-md-3">
-                    <div class="card text-white bg-info mb-3 shadow border-0">
+                    <div class="card border-0 shadow-sm border-start border-info border-4 h-100">
                         <div class="card-body">
-                            <h5 class="card-title opacity-75">Conceptos Activos</h5>
-                            <p class="card-text h2" th:text="${totalConceptos}">0</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted small text-uppercase fw-bold mb-1">Conceptos</h6>
+                                    <h2 class="mb-0 fw-bold" th:text="${totalConceptos}">0</h2>
+                                </div>
+                                <div class="bg-info bg-opacity-10 p-3 rounded-circle"><i class="bi bi-tags fs-3 text-info"></i></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-md-3">
-                    <a th:href="@{/comunidades/historial-remesas}" class="text-decoration-none">
-                        <div class="card text-white bg-warning mb-3 shadow border-0" style="cursor: pointer;">
+                    <a th:href="@{/comunidades/historial-remesas}" class="text-decoration-none h-100">
+                        <div class="card border-0 shadow-sm border-start border-warning border-4 h-100 transition-card">
                             <div class="card-body">
-                                <h5 class="card-title opacity-75">Remesas Generadas</h5>
-                                <p class="card-text h2" th:text="${totalRemesas}">0</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted small text-uppercase fw-bold mb-1">Remesas</h6>
+                                        <h2 class="mb-0 fw-bold text-dark" th:text="${totalRemesas}">0</h2>
+                                    </div>
+                                    <div class="bg-warning bg-opacity-10 p-3 rounded-circle"><i class="bi bi-send-check fs-3 text-warning"></i></div>
+                                </div>
                             </div>
                         </div>
                     </a>
                 </div>
             </div>
 
-            <div class="mt-5 text-center opacity-75">
-                <img th:src="@{/images/logo.jpg}" alt="SEPA 1914" width="150" class="rounded-circle shadow-sm mb-3">
-                <h3>Sistema de Gestión Integral de Fincas</h3>
-                <p>Bienvenido al panel de administración de comunidades SEPA 1914.</p>
+            <!-- Sección de Bienvenida Central -->
+            <div class="card border-0 shadow-sm py-5 mt-4 text-center bg-white rounded-4">
+                <div class="card-body">
+                    <img th:src="@{/images/logo.jpg}" alt="SEPA 1914" width="120" class="rounded-circle shadow mb-4 border border-4 border-light">
+                    <h3 class="fw-bold text-dark">Gestión Integral SEPA 1914</h3>
+                    <p class="text-muted mx-auto" style="max-width: 500px;">Bienvenido al centro de mando. Desde aquí puede supervisar el estado financiero de sus comunidades y la emisión de recibos bancarios.</p>
+                    <div class="mt-4">
+                        <a th:href="@{/comunidades/lista}" class="btn btn-primary px-4 py-2 shadow-sm rounded-pill">
+                            <i class="bi bi-arrow-right-circle me-2"></i> Comenzar Gestión
+                        </a>
+                    </div>
+                </div>
             </div>
-
         </main>
     </div>
 </div>
-
 <div th:replace="~{layout :: scripts}"></div>
+<style>.transition-card:hover { transform: translateY(-5px); transition: all 0.3s ease; box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }</style>
 </body>
 </html>

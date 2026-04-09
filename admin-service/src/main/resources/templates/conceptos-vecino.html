@@ -79,20 +79,20 @@
                                 <span class="input-group-text">€</span>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label small fw-bold text-muted text-uppercase">Periodicidad</label>
-                            <select id="periodSelect" name="periodicidad" class="form-select" onchange="toggleMesInicio()">
+                            <select id="periodSelect" name="periodicidad" class="form-select">
                                 <option value="MENSUAL">Mensual</option>
-                                <option value="BIMESTRAL">Bimestral (Módulo 2)</option>
-                                <option value="TRIMESTRAL">Trimestral (Módulo 3)</option>
-                                <option value="CUATRIMESTRAL">Cuatrimestral (Módulo 4)</option>
-                                <option value="SEMESTRAL">Semestral (Módulo 6)</option>
-                                <option value="ANUAL">Anual (1 vez al año)</option>
+                                <option value="BIMESTRAL">Bimestral</option>
+                                <option value="TRIMESTRAL">Trimestral</option>
+                                <option value="CUATRIMESTRAL">Cuatrimestral</option>
+                                <option value="SEMESTRAL">Semestral</option>
+                                <option value="ANUAL">Anual</option>
                             </select>
                         </div>
-                        <div class="col-md-2" id="divMesInicio" style="display: none;">
-                            <label class="form-label small fw-bold text-muted text-uppercase">Mes de Aplicación</label>
-                            <select name="mesInicio" class="form-select bg-warning-subtle border-warning-subtle">
+                        <div class="col-md-3" id="divMesInicio">
+                            <label class="form-label small fw-bold text-muted text-uppercase">Mes de Inicio (dentro del año)</label>
+                            <select name="mesInicio" id="mesInicioSelect" class="form-select bg-warning-subtle border-warning">
                                 <option value="1">Enero</option><option value="2">Febrero</option>
                                 <option value="3">Marzo</option><option value="4">Abril</option>
                                 <option value="5">Mayo</option><option value="6">Junio</option>
@@ -124,8 +124,8 @@
                             <tr class="small text-uppercase text-muted">
                                 <th class="ps-4">Descripción</th>
                                 <th>Importe</th>
-                                <th>Periodicidad / Inicio</th>
-                                <th>Estado</th>
+                                <th>Periodicidad</th>
+                                <th>Mes Inicio</th> <th>Estado</th>
                                 <th class="text-center">Acciones</th>
                             </tr>
                             </thead>
@@ -140,8 +140,11 @@
                                 </td>
                                 <td>
                                     <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1" th:text="${c.periodicidad}">MENSUAL</span>
-                                    <span th:if="${c.periodicidad.name() != 'MENSUAL'}" class="ms-1 small text-muted">
-                                        (Desde Mes <span th:text="${c.mesInicio}">1</span>)
+                                </td>
+                                <td>
+                                    <span class="fw-bold text-muted">
+                                        <i class="bi bi-calendar-event me-1"></i>
+                                        Mes <span th:text="${c.mesInicio}">1</span>
                                     </span>
                                 </td>
                                 <td>
@@ -150,30 +153,22 @@
                                 </td>
                                 <td class="text-center">
                                     <div class="btn-group shadow-sm">
-                                        <button type="button" class="btn btn-sm btn-white border"
-                                                data-bs-toggle="modal"
-                                                th:data-bs-target="'#modalEdit' + ${c.id}">
+                                        <button type="button" class="btn btn-sm btn-white border" data-bs-toggle="modal" th:data-bs-target="'#modalEdit' + ${c.id}">
                                             <i class="bi bi-pencil text-primary"></i>
                                         </button>
-
                                         <form th:action="@{/conceptos/toggle-estado/{id}(id=${c.id})}" method="post" class="d-inline">
                                             <input type="hidden" name="vecinoId" th:value="${vecino.id}">
-                                            <button type="submit" class="btn btn-sm border"
-                                                    th:classappend="${c.activo ? 'btn-white' : 'btn-success text-white'}"
-                                                    th:title="${c.activo ? 'Pausar' : 'Activar'}">
+                                            <button type="submit" class="btn btn-sm border" th:classappend="${c.activo ? 'btn-white' : 'btn-success text-white'}">
                                                 <i class="bi" th:classappend="${c.activo ? 'bi-pause-circle text-warning' : 'bi-play-circle'}"></i>
                                             </button>
                                         </form>
-
-                                        <form th:action="@{/conceptos/eliminar/{id}(id=${c.id})}" method="post" class="d-inline"
-                                              onsubmit="return confirm('¿Eliminar definitivamente este concepto?')">
+                                        <form th:action="@{/conceptos/eliminar/{id}(id=${c.id})}" method="post" class="d-inline" onsubmit="return confirm('¿Eliminar definitivamente este concepto?')">
                                             <input type="hidden" name="vecinoId" th:value="${vecino.id}">
                                             <button type="submit" class="btn btn-sm btn-white border">
                                                 <i class="bi bi-trash text-danger"></i>
                                             </button>
                                         </form>
                                     </div>
-
                                     <div class="modal fade" th:id="'modalEdit' + ${c.id}" tabindex="-1" aria-hidden="true">
                                         <div class="modal-dialog modal-dialog-centered modal-sm">
                                             <div class="modal-content border-0 shadow-lg">
@@ -186,9 +181,7 @@
                                                     <div class="modal-body text-start p-4">
                                                         <label class="form-label small fw-bold text-uppercase" th:text="${c.descripcion}">Concepto</label>
                                                         <div class="input-group">
-                                                            <input type="number" step="0.01" name="nuevoImporte"
-                                                                   class="form-control form-control-lg text-center fw-bold"
-                                                                   th:value="${c.importe}" required autofocus>
+                                                            <input type="number" step="0.01" name="nuevoImporte" class="form-control form-control-lg text-center fw-bold" th:value="${c.importe}" required autofocus>
                                                             <span class="input-group-text">€</span>
                                                         </div>
                                                     </div>
@@ -218,42 +211,15 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script th:inline="javascript">
-    /**
-     * Muestra u oculta el selector de Mes de Inicio según la periodicidad elegida.
-     */
-    function toggleMesInicio() {
-        const period = document.getElementById('periodSelect').value;
-        const div = document.getElementById('divMesInicio');
-        // Si es MENSUAL, no tiene sentido elegir mes de inicio (se cobra siempre).
-        div.style.display = (period === 'MENSUAL') ? 'none' : 'block';
-    }
-
-    /**
-     * Carga los datos desde el Maestro de Conceptos Globales.
-     */
     function cargarDesdeMaestro() {
         const select = document.getElementById('selectMaestro');
         const selectedOption = select.options[select.selectedIndex];
-
         if (selectedOption.value !== "") {
             document.getElementById('descInput').value = selectedOption.getAttribute('data-desc');
             document.getElementById('importeInput').value = selectedOption.getAttribute('data-importe');
             document.getElementById('periodSelect').value = selectedOption.getAttribute('data-period');
-
-            // Ejecutamos el toggle para mostrar el mes si la plantilla no es mensual
-            toggleMesInicio();
-
-            // Feedback visual de carga exitosa
-            const target = document.getElementById('descInput');
-            target.classList.add('is-valid');
-            setTimeout(() => { target.classList.remove('is-valid'); }, 1000);
         }
     }
-
-    // Inicialización al cargar la página
-    document.addEventListener("DOMContentLoaded", function() {
-        toggleMesInicio();
-    });
 </script>
 
 <style>

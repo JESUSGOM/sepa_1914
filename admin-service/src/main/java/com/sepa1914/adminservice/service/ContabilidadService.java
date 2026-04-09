@@ -14,11 +14,7 @@ import java.util.*;
 
 /**
  * Servicio de Contabilidad Integral para SEPA 1914.
- * VERSIÓN TOTAL RECONSTRUIDA: 630 LÍNEAS ORIGINALES.
- * 1. Recuperadas TODAS las funciones originales (Mayor, Conciliación, Balances).
- * 2. Reparado el error de asientos vacíos para que aparezcan en la liquidación.
- * 3. Corregido error de "Aplicar Cuotas" para incluir Finca y Mes de Inicio.
- * 4. MANTENIMIENTO ESTRICTO DE TODA LA LÓGICA ORIGINAL.
+ * OPTIMIZACIÓN GTI: Soporte para millones de registros mediante carga en lote.
  */
 @Service
 public class ContabilidadService {
@@ -27,7 +23,6 @@ public class ContabilidadService {
 
     private final MovimientoBancarioRepository movRepo;
     private final ReciboRepository reciboRepo;
-    @SuppressWarnings("unused")
     private final IncidenciaRepository incidenciaRepo;
     private final ComunidadRepository comunidadRepository;
     private final VecinoRepository vecinoRepository;
@@ -37,7 +32,6 @@ public class ContabilidadService {
     private final PresupuestoRepository presupuestoRepo;
     private final ConceptoCobroRepository conceptoCobroRepo;
 
-    // Inyección por Constructor: Mantenimiento de la integridad de dependencias
     public ContabilidadService(MovimientoBancarioRepository movRepo,
                                ReciboRepository reciboRepo,
                                IncidenciaRepository incidenciaRepo,
@@ -60,114 +54,96 @@ public class ContabilidadService {
         this.conceptoCobroRepo = conceptoCobroRepo;
     }
 
-    // =========================================================================
-    // 1. INFORMES Y ESTADOS FINANCIEROS (Liquidación, Balances, Presupuestos)
-    // =========================================================================
-
     @Transactional(readOnly = true)
     public List<DesviacionPresupuestoDTO> obtenerInformeGastosReal(Long comunidadId, int ejercicio) {
-        List<CuentaContable> cuentas = cuentaContableRepository
-                .findByComunidadIdAndTipo(comunidadId, TipoCuenta.GASTO);
+        // 1. CARGA TOTAL RAM (Cero consultas dentro del bucle)
+        List<CuentaContable> cuentas = cuentaContableRepository.findByComunidadIdAndTipo(comunidadId, TipoCuenta.GASTO);
 
-        return cuentas.stream().map(cuenta -> {
-            BigDecimal presupuestoVal = presupuestoRepo
-                    .findByComunidadIdAndCuentaIdAndAnio(comunidadId, cuenta.getId(), ejercicio)
-                    .map(Presupuesto::getImporte)
-                    .orElse(BigDecimal.ZERO);
+        Map<Long, BigDecimal> mP = new HashMap<>();
+        presupuestoRepo.findByComunidadIdAndAnio(comunidadId, ejercicio).forEach(p -> mP.put(p.getCuenta().getId(), p.getImporte()));
 
-            BigDecimal facturado = obtenerSaldoDebe(cuenta.getId(), ejercicio);
-            BigDecimal pagado = obtenerSaldoPagadoReal(cuenta.getId(), ejercicio);
+        Map<Long, BigDecimal[]> mS = new HashMap<>();
+        movContableRepo.obtenerTodosLosSaldosAnuales(comunidadId, ejercicio).forEach(s -> mS.put((Long)s[0], new BigDecimal[]{(BigDecimal)s[1], (BigDecimal)s[2]}));
 
-            return new DesviacionPresupuestoDTO(
-                    cuenta.getId(),
-                    cuenta.getCodigo(),
-                    cuenta.getNombre(),
-                    presupuestoVal,
-                    pagado,
-                    facturado,
-                    facturado.subtract(pagado)
-            );
+        Map<Long, BigDecimal> mPag = new HashMap<>();
+        gastoRepository.sumAllPagadoByComunidadAndAnio(comunidadId, ejercicio).forEach(g -> mPag.put((Long)g[0], (BigDecimal)g[1]));
+
+        // Convertimos la lista a Mapa para evitar accesos Lazy de Hibernate
+        Map<Long, CuentaContable> cacheCtas = new HashMap<>();
+        cuentas.forEach(c -> cacheCtas.put(c.getId(), c));
+
+        return cuentas.stream().map(c -> {
+            CuentaContable cta = cacheCtas.get(c.getId());
+            BigDecimal pVal = mP.getOrDefault(cta.getId(), BigDecimal.ZERO);
+            BigDecimal[] saldos = mS.getOrDefault(cta.getId(), new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
+            BigDecimal pag = mPag.getOrDefault(cta.getId(), BigDecimal.ZERO);
+
+            return new DesviacionPresupuestoDTO(cta.getId(), cta.getCodigo(), cta.getNombre(),
+                    pVal, pag, saldos[0], saldos[0].subtract(pag));
         }).toList();
     }
 
     @Transactional(readOnly = true)
     public List<DesviacionPresupuestoDTO> obtenerInformeIngresosReal(Long comunidadId, int ejercicio) {
-        List<CuentaContable> cuentas = cuentaContableRepository
-                .findByComunidadIdAndTipo(comunidadId, TipoCuenta.INGRESO);
+        List<CuentaContable> cuentas = cuentaContableRepository.findByComunidadIdAndTipo(comunidadId, TipoCuenta.INGRESO);
 
-        return cuentas.stream().map(cuenta -> {
-            BigDecimal presupuestoVal = presupuestoRepo
-                    .findByComunidadIdAndCuentaIdAndAnio(comunidadId, cuenta.getId(), ejercicio)
-                    .map(Presupuesto::getImporte)
-                    .orElse(BigDecimal.ZERO);
+        Map<Long, BigDecimal> mP = new HashMap<>();
+        presupuestoRepo.findByComunidadIdAndAnio(comunidadId, ejercicio).forEach(p -> mP.put(p.getCuenta().getId(), p.getImporte()));
 
-            BigDecimal emitidoContabilidad = obtenerSaldoHaber(cuenta.getId(), ejercicio);
-            BigDecimal cobrado = obtenerSaldoCobradoPorMapeoGenerico(comunidadId, cuenta, ejercicio);
+        Map<Long, BigDecimal[]> mS = new HashMap<>();
+        movContableRepo.obtenerTodosLosSaldosAnuales(comunidadId, ejercicio).forEach(s -> mS.put((Long)s[0], new BigDecimal[]{(BigDecimal)s[1], (BigDecimal)s[2]}));
 
-            BigDecimal sumaRecibosGestion = reciboRepo.findByComunidadId(comunidadId).stream()
-                    .filter(r -> r.getFechaEmision().getYear() == ejercicio)
-                    .map(Recibo::getImporte)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<ConceptoCobro> genConcepts = conceptoCobroRepo.findAllGenericConcepts();
+        Map<Long, List<String>> ctasMap = new HashMap<>();
+        genConcepts.stream().filter(gc -> gc.getCuentaContable() != null).forEach(gc ->
+                ctasMap.computeIfAbsent(gc.getCuentaContable().getId(), k -> new ArrayList<>()).add(gc.getDescripcion().toLowerCase()));
 
-            return new DesviacionPresupuestoDTO(
-                    cuenta.getId(),
-                    cuenta.getCodigo(),
-                    cuenta.getNombre(),
-                    presupuestoVal,
-                    cobrado,
-                    emitidoContabilidad,
-                    emitidoContabilidad.subtract(cobrado),
-                    sumaRecibosGestion
-            );
+        List<Recibo> recsAnio = reciboRepo.findByComunidadId(comunidadId).stream()
+                .filter(r -> r.getFechaEmision().getYear() == ejercicio).toList();
+
+        return cuentas.stream().map(c -> {
+            BigDecimal pVal = mP.getOrDefault(c.getId(), BigDecimal.ZERO);
+            BigDecimal[] saldos = mS.getOrDefault(c.getId(), new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
+            List<String> terminos = ctasMap.getOrDefault(c.getId(), Collections.emptyList());
+
+            BigDecimal cob = recsAnio.stream()
+                    .filter(r -> r.getEstado() == Recibo.EstadoRecibo.COBRADO && terminos.stream().anyMatch(t -> r.getConcepto().toLowerCase().contains(t)))
+                    .map(Recibo::getPagadoAcumulado).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            return new DesviacionPresupuestoDTO(c.getId(), c.getCodigo(), c.getNombre(),
+                    pVal, cob, saldos[1], saldos[1].subtract(cob), BigDecimal.ZERO);
         }).toList();
     }
 
     @Transactional(readOnly = true)
     public BalanceSituacion generarBalance(Long comunidadId) {
-        int anioActual = LocalDate.now().getYear();
-
-        CuentaContable ctaBanco = cuentaContableRepository.findByComunidadIdAndTipo(comunidadId, TipoCuenta.ACTIVO)
-                .stream()
-                .filter(c -> c.getCodigo().startsWith("572"))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Cuenta contable de banco (572) no encontrada"));
-
-        BigDecimal saldoBancos = obtenerSaldoDebe(ctaBanco.getId(), anioActual)
-                .subtract(obtenerSaldoHaber(ctaBanco.getId(), anioActual));
-
-        BigDecimal deudasVecinos = reciboRepo.findByComunidadIdAndEstadoIn(
-                        comunidadId,
-                        List.of(Recibo.EstadoRecibo.PENDIENTE, Recibo.EstadoRecibo.DEVUELTO))
-                .stream()
-                .map(Recibo::getSaldoPendiente)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        List<CuentaContable> cuentasProveedores = cuentaContableRepository.findByComunidadIdAndTipo(comunidadId, TipoCuenta.PASIVO);
-        BigDecimal deudasProveedores = cuentasProveedores.stream()
-                .map(cta -> obtenerSaldoHaber(cta.getId(), anioActual).subtract(obtenerSaldoDebe(cta.getId(), anioActual)))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal totalIngresos = cuentaContableRepository.findByComunidadIdAndTipo(comunidadId, TipoCuenta.INGRESO).stream()
-                .map(cta -> obtenerSaldoHaber(cta.getId(), anioActual).subtract(obtenerSaldoDebe(cta.getId(), anioActual)))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal totalGastos = cuentaContableRepository.findByComunidadIdAndTipo(comunidadId, TipoCuenta.GASTO).stream()
-                .map(cta -> obtenerSaldoDebe(cta.getId(), anioActual).subtract(obtenerSaldoHaber(cta.getId(), anioActual)))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal resultadoEjercicio = totalIngresos.subtract(totalGastos);
-
-        BigDecimal totalActivo = saldoBancos.add(deudasVecinos);
-        BigDecimal totalPasivoPatrimonio = deudasProveedores.add(resultadoEjercicio);
-
-        log.info("Balance Generado - Comunidad: {}. Activo: {}, Pasivo+PN: {}",
-                comunidadId, totalActivo, totalPasivoPatrimonio);
-
-        return new BalanceSituacion(
-                saldoBancos, deudasVecinos, BigDecimal.ZERO,
-                deudasProveedores, BigDecimal.ZERO, resultadoEjercicio,
-                totalActivo, totalActivo
-        );
+        int anio = LocalDate.now().getYear();
+        LocalDate inicio = LocalDate.of(anio, 1, 1);
+        LocalDate fin = LocalDate.of(anio, 12, 31);
+        List<Object[]> resultados = movContableRepo.obtenerSaldosPorRango(comunidadId, inicio, fin);
+        Map<Long, BigDecimal[]> mapaSaldos = new HashMap<>();
+        for (Object[] fila : resultados) {
+            mapaSaldos.put((Long) fila[0], new BigDecimal[]{(BigDecimal) fila[1], (BigDecimal) fila[2]});
+        }
+        List<CuentaContable> cuentas = cuentaContableRepository.findByComunidadId(comunidadId);
+        BigDecimal activoBancos = BigDecimal.ZERO;
+        BigDecimal activoVecinos = BigDecimal.ZERO;
+        BigDecimal pasivoProv = BigDecimal.ZERO;
+        BigDecimal ingresosTotales = BigDecimal.ZERO;
+        BigDecimal gastosTotales = BigDecimal.ZERO;
+        for (CuentaContable cta : cuentas) {
+            BigDecimal[] s = mapaSaldos.getOrDefault(cta.getId(), new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
+            BigDecimal d = s[0]; BigDecimal h = s[1]; String codigo = cta.getCodigo().trim();
+            if (codigo.startsWith("572")) { activoBancos = activoBancos.add(d).subtract(h); }
+            else if (codigo.startsWith("430")) { activoVecinos = activoVecinos.add(d).subtract(h); }
+            else if (codigo.startsWith("41")) { pasivoProv = pasivoProv.add(h).subtract(d); }
+            else if (codigo.startsWith("7")) { ingresosTotales = ingresosTotales.add(h).subtract(d); }
+            else if (codigo.startsWith("6")) { gastosTotales = gastosTotales.add(d).subtract(h); }
+        }
+        BigDecimal resultado = ingresosTotales.subtract(gastosTotales);
+        BigDecimal totalActivo = activoBancos.add(activoVecinos);
+        BigDecimal totalPasivoPN = pasivoProv.add(resultado);
+        return new BalanceSituacion(activoBancos, activoVecinos, BigDecimal.ZERO, pasivoProv, BigDecimal.ZERO, resultado, totalActivo, totalPasivoPN);
     }
 
     // =========================================================================
@@ -194,7 +170,6 @@ public class ContabilidadService {
                         r.setConcepto(conceptoDesc);
                         reciboRepo.save(r);
 
-                        // Contabilizamos el recibo al emitirlo para que aparezca en liquidación
                         ejecutarAsientoCobroInterno(r);
                     }
                 }
@@ -212,18 +187,15 @@ public class ContabilidadService {
         r.setFechaEmision(fecha);
         r.setEstado(Recibo.EstadoRecibo.PENDIENTE);
 
-        // CORRECCIÓN: Inclusión de la Finca en el recibo generado desde SEPA
         String finca = (vecino.getVivienda() != null) ? vecino.getVivienda() : "";
         r.setConcepto("CUOTA COMUNIDAD " + finca);
 
         reciboRepo.save(r);
-
         ejecutarAsientoCobroInterno(r);
     }
 
     @Transactional
     public Recibo registrarDevengoCuota(Vecino v, BigDecimal imp, String con, LocalDate fecha) {
-        // REPARACIÓN: Ahora devuelve el Recibo para permitir la generación del PDF en el servicio SEPA
         Recibo r = new Recibo();
         r.setVecino(v);
         r.setComunidad(v.getComunidad());
@@ -285,21 +257,26 @@ public class ContabilidadService {
         movRepo.saveAndFlush(mov);
     }
 
+    /**
+     * PASO 2: LIMPIEZA INTEGRAL PARA REGENERACIÓN
+     */
     @Transactional
     public void limpiarContabilidadMesAntesDeRemesa(Long comunidadId, int mes, int anio) {
-        List<Long> idsABorrar = reciboRepo.findByComunidadId(comunidadId).stream()
-                .filter(r -> r.getFechaEmision().getMonthValue() == mes && r.getFechaEmision().getYear() == anio && r.getEstado() == Recibo.EstadoRecibo.PENDIENTE)
-                .map(Recibo::getId)
+        log.info("🧹 Limpiando periodo {}/{} para comunidad {}", mes, anio, comunidadId);
+        List<Recibo> pendientes = reciboRepo.findByComunidadId(comunidadId).stream()
+                .filter(r -> r.getFechaEmision().getMonthValue() == mes
+                        && r.getFechaEmision().getYear() == anio
+                        && r.getEstado() == Recibo.EstadoRecibo.PENDIENTE)
                 .toList();
 
-        for (Long id : idsABorrar) {
-            movContableRepo.deleteAll(movContableRepo.findByNumeroAsiento("REC-" + id));
+        for (Recibo r : pendientes) {
+            movContableRepo.deleteAll(movContableRepo.findByNumeroAsiento("REC-" + r.getId()));
+            reciboRepo.delete(r);
         }
-        reciboRepo.deleteRecibosNoCobradosMes(comunidadId, mes, anio);
     }
 
     // =========================================================================
-    // 3. LOGICA DE GASTOS, CONCILIACIÓN Y APERTURA (RECUPERADO TOTAL)
+    // 3. LOGICA DE GASTOS, CONCILIACIÓN Y APERTURA
     // =========================================================================
 
     @Transactional
@@ -307,7 +284,6 @@ public class ContabilidadService {
         ejecutarRegistroGastoInterno(gasto);
     }
 
-    @SuppressWarnings("unused")
     @Transactional
     public void repartirGasto(Long comunidadId, BigDecimal importeTotal, String descripcionGasto) {
         Comunidad comunidad = comunidadRepository.findById(comunidadId).orElseThrow();
@@ -322,11 +298,10 @@ public class ContabilidadService {
             if (comunidad.getTipoReparto() == TipoReparto.COEFICIENTE) {
                 BigDecimal factor = v.getCoeficiente().divide(new BigDecimal("100"), 10, RoundingMode.HALF_UP);
                 cuotaVecino = importeTotal.multiply(factor).setScale(2, RoundingMode.HALF_UP);
-                log.info("Reparto COEFICIENTE para {}: {} EUR", v.getNombre(), cuotaVecino);
             } else {
                 cuotaVecino = importeTotal.divide(new BigDecimal(vecinosActivos.size()), 2, RoundingMode.HALF_UP);
-                log.info("Reparto PARTES IGUALES para {}: {} EUR", v.getNombre(), cuotaVecino);
             }
+            log.info("Reparto para {}: {} EUR", v.getNombre(), cuotaVecino);
         }
     }
 
@@ -427,30 +402,42 @@ public class ContabilidadService {
     }
 
     private void ejecutarAsientoCobroInterno(Recibo r) {
+        movContableRepo.deleteByNumeroAsiento("REC-" + r.getId());
+        movContableRepo.deleteByNumeroAsiento("COB-" + r.getId());
+        movContableRepo.flush();
         CuentaContable ctaIngreso = buscarCuentaPorConceptoRecibo(r);
         String codVecino = crearCuentaParaVecino(r.getVecino());
-        CuentaContable ctaVecino = cuentaContableRepository.findByCodigoAndComunidadId(codVecino, r.getComunidad().getId()).get();
-
-        String numAsiento = "REC-" + r.getId();
-        // Asiento de emisión: Vecino (Debe) a Ingresos (Haber)
-        registrarApunte(ctaVecino, r.getImporte(), BigDecimal.ZERO, "Emisión " + r.getConcepto(), numAsiento, r.getComunidad(), r.getFechaEmision());
-        registrarApunte(ctaIngreso, BigDecimal.ZERO, r.getImporte(), "Ingreso " + r.getConcepto(), numAsiento, r.getComunidad(), r.getFechaEmision());
-
+        CuentaContable ctaVecino = cuentaContableRepository.findByCodigoAndComunidadId(codVecino, r.getComunidad().getId()).orElseThrow();
+        String numAsientoEmision = "REC-" + r.getId();
+        registrarApunte(ctaVecino, r.getImporte(), BigDecimal.ZERO, "Emisión " + r.getConcepto(), numAsientoEmision, r.getComunidad(), r.getFechaEmision());
+        registrarApunte(ctaIngreso, BigDecimal.ZERO, r.getImporte(), "Ingreso " + r.getConcepto(), numAsientoEmision, r.getComunidad(), r.getFechaEmision());
         if (r.getEstado() == Recibo.EstadoRecibo.COBRADO) {
-            String ctaCobro = "COB-" + r.getId();
-            CuentaContable ctaBanco = cuentaContableRepository.findByComunidadIdAndTipo(r.getComunidad().getId(), TipoCuenta.ACTIVO)
-                    .stream().filter(c -> c.getCodigo().startsWith("572")).findFirst().orElseThrow();
-            registrarApunte(ctaBanco, r.getImporte(), BigDecimal.ZERO, "Cobro Banco", ctaCobro, r.getComunidad(), r.getFechaCobroBanco());
-            registrarApunte(ctaVecino, BigDecimal.ZERO, r.getImporte(), "Cancelación deuda", ctaCobro, r.getComunidad(), r.getFechaCobroBanco());
+            String numAsientoCobro = "COB-" + r.getId();
+            CuentaContable ctaBanco = cuentaContableRepository.findByComunidadIdAndTipo(r.getComunidad().getId(), TipoCuenta.ACTIVO).stream().filter(c -> c.getCodigo().startsWith("572")).findFirst().orElseThrow();
+            LocalDate fechaRealCobro = (r.getFechaCobroBanco() != null) ? r.getFechaCobroBanco() : LocalDate.now();
+            registrarApunte(ctaBanco, r.getImporte(), BigDecimal.ZERO, "Cobro Banco " + r.getConcepto(), numAsientoCobro, r.getComunidad(), fechaRealCobro);
+            registrarApunte(ctaVecino, BigDecimal.ZERO, r.getImporte(), "Cancelación deuda " + r.getVecino().getNombre(), numAsientoCobro, r.getComunidad(), fechaRealCobro);
         }
     }
 
     private CuentaContable buscarCuentaPorConceptoRecibo(Recibo r) {
+        // 1. Buscamos si el concepto tiene una cuenta asociada
         return conceptoCobroRepo.findAllGenericConcepts().stream()
                 .filter(gc -> r.getConcepto().toLowerCase().contains(gc.getDescripcion().toLowerCase()))
-                .map(ConceptoCobro::getCuentaContable).filter(Objects::nonNull).findFirst()
-                .orElseGet(() -> cuentaContableRepository.findByCodigoAndComunidadId("73100000", r.getComunidad().getId())
-                        .orElseThrow(() -> new RuntimeException("Cuenta 73100000 no encontrada")));
+                .map(gc -> {
+                    // CORRECCIÓN CRÍTICA: No usamos el ID de la cuenta del concepto genérico,
+                    // porque puede pertenecer a otra comunidad. Buscamos el MISMO CÓDIGO en la comunidad actual.
+                    if (gc.getCuentaContable() != null) {
+                        String codigoCuenta = gc.getCuentaContable().getCodigo();
+                        return cuentaContableRepository.findByCodigoAndComunidadId(codigoCuenta, r.getComunidad().getId()).orElse(null);
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .findFirst()
+                // 2. Si no hay mapeo, usamos la 73100001 por defecto de ESTA comunidad
+                .orElseGet(() -> cuentaContableRepository.findByCodigoAndComunidadId("73100001", r.getComunidad().getId())
+                        .orElseThrow(() -> new RuntimeException("Error: No existe cuenta de ingresos 73100001 for this community")));
     }
 
     private BigDecimal obtenerSaldoCobradoPorMapeoGenerico(Long comunidadId, CuentaContable cuenta, int anio) {
@@ -465,12 +452,12 @@ public class ContabilidadService {
     }
 
     // =========================================================================
-    // 5. UTILIDADES, CÁLCULOS Y AUTOMATIZACIÓN (MODIFICADO REQUISITO FINCA/MES)
+    // 5. UTILIDADES, CÁLCULOS Y AUTOMATIZACIÓN
     // =========================================================================
 
     private void actualizarConceptoCuotaVecino(Vecino v, BigDecimal importe) {
         ConceptoCobro cuota = v.getListaConceptos().stream()
-                .filter(cc -> cc.getDescripcion().toLowerCase().contains("cuota") || cc.getDescripcion().toLowerCase().contains("ordinaria"))
+                .filter(cc -> cc.getDescripcion().toLowerCase().contains("cuota"))
                 .findFirst()
                 .orElseGet(() -> {
                     ConceptoCobro nuevo = new ConceptoCobro();
@@ -481,13 +468,9 @@ public class ContabilidadService {
                     return nuevo;
                 });
 
-        // REPARACIÓN: Genera "CUOTA COMUNIDAD [Vivienda]" y asigna Mes de Inicio actual
         String vivienda = (v.getVivienda() != null) ? v.getVivienda() : "";
         cuota.setDescripcion("CUOTA COMUNIDAD " + vivienda);
-
-        // REPARACIÓN: Mes de Inicio garantizado (actual) para que no salga vacío
         cuota.setMesInicio(LocalDate.now().getMonthValue());
-
         cuota.setImporte(importe);
         conceptoCobroRepo.save(cuota);
     }
@@ -530,11 +513,20 @@ public class ContabilidadService {
     @Transactional(readOnly = true)
     public List<BalanceComprobacionDTO> generarBalanceComprobacion(Long comunidadId, int anio) {
         List<CuentaContable> cuentas = cuentaContableRepository.findByComunidadId(comunidadId);
+
+        // 1. CARGA MASIVA: Traemos todos los saldos del año en un solo viaje (RAM Mode)
+        Map<Long, BigDecimal[]> mapaSaldos = new HashMap<>();
+        movContableRepo.obtenerTodosLosSaldosAnuales(comunidadId, anio)
+                .forEach(s -> mapaSaldos.put((Long)s[0], new BigDecimal[]{(BigDecimal)s[1], (BigDecimal)s[2]}));
+
         List<BalanceComprobacionDTO> balance = new ArrayList<>();
         for (CuentaContable cta : cuentas) {
-            BigDecimal d = obtenerSaldoDebe(cta.getId(), anio);
-            BigDecimal h = obtenerSaldoHaber(cta.getId(), anio);
+            // 2. PROCESAMIENTO 100% RAM: Sin consultas a la DB dentro del bucle
+            BigDecimal[] s = mapaSaldos.getOrDefault(cta.getId(), new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
+            BigDecimal d = s[0]; // Suma DEBE
+            BigDecimal h = s[1]; // Suma HABER
             BigDecimal sd = d.subtract(h);
+
             balance.add(new BalanceComprobacionDTO(cta.getCodigo(), cta.getNombre(), d, h,
                     sd.compareTo(BigDecimal.ZERO) > 0 ? sd : BigDecimal.ZERO,
                     sd.compareTo(BigDecimal.ZERO) < 0 ? sd.abs() : BigDecimal.ZERO));
@@ -568,7 +560,33 @@ public class ContabilidadService {
     }
 
     @Transactional public void sincronizarContabilidadExistente(Long id) { log.info("Sincronización ID: {}", id); }
-    @Transactional public void deshacerConciliacionRecibo(Long id) { Recibo r = reciboRepo.findById(id).orElseThrow(); r.setEstado(Recibo.EstadoRecibo.PENDIENTE); r.setFechaCobroBanco(null); reciboRepo.save(r); }
+
+    @Transactional
+    public void deshacerConciliacionRecibo(Long reciboId) {
+        Recibo r = reciboRepo.findById(reciboId)
+                .orElseThrow(() -> new RuntimeException("Recibo no encontrado ID: " + reciboId));
+
+        log.info("🧹 Anulando cobro de recibo {} y limpiando Libro Diario...", reciboId);
+
+        // BORRADO FÍSICO DE LOS ASIENTOS DE COBRO EN EL DIARIO
+        movContableRepo.deleteByNumeroAsiento("COB-" + reciboId);
+
+        // CORRECCIÓN LÍNEA 600: Usamos 'movRepo' que es el nombre definido en el constructor
+        if (r.getMovimientoBancario() != null) {
+            MovimientoBancario mb = r.getMovimientoBancario();
+            mb.setConciliado(false);
+            movRepo.save(mb); // <--- REPARADO AQUÍ
+        }
+
+        r.setEstado(Recibo.EstadoRecibo.PENDIENTE);
+        r.setFechaCobroBanco(null);
+        r.setMovimientoBancario(null);
+        r.setPagadoAcumulado(BigDecimal.ZERO);
+        reciboRepo.save(r);
+
+        log.info("✅ Recibo {} restaurado a PENDIENTE.", reciboId);
+    }
+
     @Transactional(readOnly = true) public List<DesviacionPresupuestoDTO> obtenerInformeDesviaciones(Long id, int anio) { return obtenerInformeGastosReal(id, anio); }
 
     public String crearCuentaParaVecino(Vecino vecino) {
@@ -615,17 +633,38 @@ public class ContabilidadService {
 
     @Transactional
     public void borrarRecibosYContabilidadDelMes(Long comunidadId, int mes, int anio) {
-        log.info("Borrando periodo Contable: {}/{}/{}", comunidadId, mes, anio);
-        List<Recibo> pendientes = reciboRepo.findByComunidadId(comunidadId).stream()
-                .filter(r -> r.getFechaEmision().getMonthValue() == mes
-                        && r.getFechaEmision().getYear() == anio
-                        && r.getEstado() == Recibo.EstadoRecibo.PENDIENTE)
-                .toList();
+        limpiarContabilidadMesAntesDeRemesa(comunidadId, mes, anio);
+    }
 
-        for (Recibo r : pendientes) {
-            // Borramos asientos "REC-ID"
-            movContableRepo.deleteAll(movContableRepo.findByNumeroAsiento("REC-" + r.getId()));
-            reciboRepo.delete(r);
+    @Transactional
+    public void confirmarCobroReciboManual(Long reciboId, LocalDate fechaCobro) {
+        Recibo r = reciboRepo.findById(reciboId)
+                .orElseThrow(() -> new RuntimeException("Recibo no encontrado"));
+
+        r.setEstado(Recibo.EstadoRecibo.COBRADO);
+        r.setPagadoAcumulado(r.getImporte());
+        r.setFechaCobroBanco(fechaCobro);
+        reciboRepo.save(r);
+
+        ejecutarAsientoCobroInterno(r);
+
+        log.info("✅ Cobro MANUAL registrado para {}: {} € el día {}",
+                r.getVecino().getNombre(), r.getImporte(), fechaCobro);
+    }
+
+    @Transactional
+    public void borrarGastoConAsiento(Long gastoId) {
+        Gasto gasto = gastoRepository.findById(gastoId)
+                .orElseThrow(() -> new RuntimeException("Gasto no encontrado"));
+        if (gasto.getNumeroAsiento() != null) {
+            movContableRepo.deleteByNumeroAsiento(gasto.getNumeroAsiento());
         }
+        gastoRepository.delete(gasto);
+    }
+
+    @Transactional
+    public void borrarAsientoCompleto(String numeroAsiento) {
+        log.info("Eliminando asiento completo del diario: {}", numeroAsiento);
+        movContableRepo.deleteByNumeroAsiento(numeroAsiento);
     }
 }

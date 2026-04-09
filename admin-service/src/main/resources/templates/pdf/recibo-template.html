@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Recibo</title>
+    <style>
+        @page { size: A4; margin: 1cm; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #333; line-height: 1.4; }
+        .header { border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 15px; }
+        .recibo-box { border: 1px solid #ccc; padding: 20px; border-radius: 8px; background-color: #fafafa; }
+        .footer { margin-top: 40px; font-size: 9pt; color: #666; text-align: center; border-top: 1px dashed #ccc; padding-top: 8px; }
+        .bold { font-weight: bold; }
+        .text-right { text-align: right; }
+        .title-mes { text-transform: uppercase; color: #004a99; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h2 th:text="${comunidad.nombre}">COMUNIDAD</h2>
+    <p>CIF: <span th:text="${comunidad.identificadorAcreedor}">CIF</span></p>
+</div>
+<div class="recibo-box">
+    <h3>RECIBO CUOTA - <span class="title-mes" th:text="${nombreMes}">MES</span> <span th:text="${ejercicio}">2026</span></h3>
+    <hr/>
+    <p><span class="bold">Propietario:</span> <span th:text="${vecino.nombre}">Nombre</span></p>
+    <p><span class="bold">Finca:</span> <span th:text="${vecino.vivienda}">1A</span></p>
+    <p><span class="bold">Concepto:</span> <span th:text="${recibo.concepto}">Concepto</span></p>
+    <hr/>
+    <h2 class="text-right">TOTAL: <span th:text="${#numbers.formatDecimal(recibo.importe, 1, 2, 'COMMA')}">0.00</span> €</h2>
+</div>
+<div class="footer">
+    <p>Este documento es un justificante de emisión de recibo.</p>
+    <p th:if="${vecino.domiciliado}">Recibo domiciliado: <span th:text="${vecino.iban}">IBAN</span></p>
+    <p th:unless="${vecino.domiciliado}">Pago por métodos manuales establecidos por la administración.</p>
+    <p style="margin-top: 10px; font-size: 7pt;">Generado por Sistema SEPA 1914</p>
+</div>
+</body>
+</html>
