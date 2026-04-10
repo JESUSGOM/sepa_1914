@@ -31,4 +31,7 @@ public interface VecinoRepository extends JpaRepository<Vecino, Long> {
      */
     @Query("SELECT v FROM Vecino v WHERE v.id = :id AND v.comunidad.administrador.username = :username")
     Optional<Vecino> findByIdAndAdminUsername(@Param("id") Long id, @Param("username") String username);
+
+    @Query("SELECT DISTINCT v FROM Vecino v LEFT JOIN FETCH v.listaConceptos WHERE v.comunidad.id = :comunidadId AND v.activo = true")
+    List<Vecino> findAllByComunidadIdWithConceptos(@Param("comunidadId") Long comunidadId);
 }

@@ -31,3 +31,24 @@ build/
 
 ### VS Code ###
 .vscode/
+
+################################################################################
+### SEGURIDAD GTI - PROTECCIÓN DE CERTIFICADOS Y LOGS AUDITABLES              ###
+################################################################################
+
+# Ignorar certificados digitales (FNMT, P12, PFX)
+# NUNCA deben subirse al repositorio por seguridad legal
+*.p12
+*.pfx
+*.jks
+*.pem
+
+# Ignorar archivos de logs de la aplicación
+# (Evita subir trazas de datos de vecinos a Git)
+*.log
+logs/
+admin-service/logs/
+
+# Ignorar ficheros generados localmente (PDFs y Remesas)
+/ficheros/
+/sepa1914/

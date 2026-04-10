@@ -6,6 +6,7 @@ import com.sepa1914.adminservice.util.HardwareUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import java.time.LocalDateTime;
@@ -23,63 +24,72 @@ public class LicenseService {
 
     private final String API_URL = "https://jfgb.es/sepa/validar_licencia.php";
 
-    // --- SISTEMA DE CACHÉ GTI (Aceleración) ---
-    private static boolean cacheValida = false;
+    // --- SISTEMA DE CACHÉ GTI (Aceleración Máxima) ---
+    private static boolean cacheValida = true; // Inicializamos en true para permitir el primer arranque instantáneo
     private static LocalDateTime fechaProximaValidacion = null;
-    private final int MINUTOS_CACHE = 30; // El sistema solo "llamará a casa" cada 30 min.
+    private final int MINUTOS_CACHE = 30;
 
+    /**
+     * MÉTODO DE ENTRADA (INSTANTÁNEO)
+     * No bloquea el hilo principal. Devuelve el último estado conocido de inmediato.
+     */
     public boolean validarLicencia() {
-        // 1. COMPROBACIÓN DE CACHÉ (Impacto inmediato en velocidad)
-        if (cacheValida && fechaProximaValidacion != null && LocalDateTime.now().isBefore(fechaProximaValidacion)) {
-            // Si ya validamos hace poco, no perdemos tiempo en consultas ni red
-            return true;
+        // Si no hemos validado nunca o la caché ha expirado...
+        if (fechaProximaValidacion == null || LocalDateTime.now().isAfter(fechaProximaValidacion)) {
+            // Disparamos la validación pesada EN SEGUNDO PLANO
+            // Usamos un hilo aparte para que el usuario no espere los 1.9s
+            ejecutarValidacionEnSegundoPlano();
+
+            // Si es la primera vez (null), establecemos una fecha provisional para no saturar a hilos
+            if (fechaProximaValidacion == null) {
+                fechaProximaValidacion = LocalDateTime.now().plusSeconds(30);
+            }
         }
 
-        String hid = getEquipoID();
-        log.info("🔍 Ejecutando validación de seguridad completa (Caché expirada o primer inicio)...");
+        // Devolvemos el estado de la caché de inmediato (0 segundos de espera)
+        return cacheValida;
+    }
 
-        // --- PASO 1: VALIDACIÓN LOCAL (MAESTRA) ---
-        Optional<LicenciaMaestra> licenciaLocal = licenciaMaestraRepository.findByHardwareIdAndActivoTrue(hid);
-
-        if (licenciaLocal.isPresent()) {
-            log.info("✅ Acceso local concedido para: {}", hid);
-            actualizarCache(true);
-            return true;
-        }
-
-        // --- PASO 2: VALIDACIÓN REMOTA (API PHP) ---
+    /**
+     * MÉTODO ASÍNCRONO (EL QUE TARDA)
+     * Se ejecuta en un hilo de "task-executor".
+     */
+    @Async
+    public void ejecutarValidacionEnSegundoPlano() {
         try {
-            log.info("🌐 Consultando servidor remoto jfgb.es...");
-            String urlCheck = API_URL + "?hid=" + hid;
+            String hid = getEquipoID();
+            log.info("🌐 [GTI BACKGROUND] Iniciando consulta de licencia en segundo plano...");
 
+            // 1. Check Local
+            Optional<LicenciaMaestra> licenciaLocal = licenciaMaestraRepository.findByHardwareIdAndActivoTrue(hid);
+            if (licenciaLocal.isPresent()) {
+                log.info("✅ [GTI] Acceso local verificado.");
+                actualizarCache(true);
+                return;
+            }
+
+            // 2. Check Remoto (jfgb.es) - Aquí es donde se perdían los 2 segundos
+            String urlCheck = API_URL + "?hid=" + hid;
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(urlCheck, Map.class);
 
             if (response != null && Boolean.TRUE.equals(response.get("activo"))) {
-                log.info("✅ Licencia validada remotamente.");
+                log.info("✅ [GTI] Licencia remota validada correctamente.");
                 actualizarCache(true);
-                return true;
+            } else {
+                log.warn("❌ [GTI] El servidor remoto indica licencia inactiva.");
+                actualizarCache(false);
             }
-
-            log.warn("❌ Licencia rechazada por el servidor.");
-            actualizarCache(false);
-            return false;
 
         } catch (Exception e) {
-            log.error("⚠️ Error de conexión: {}", e.getMessage());
-
-            // Lógica de gracia: Si antes funcionó, damos 24h de margen sin internet
-            if (cacheValida) {
-                log.info("⏳ Usando periodo de gracia por fallo de red.");
-                return true;
-            }
-            return false;
+            log.error("⚠️ [GTI] Error en validación asíncrona: {}. Se mantiene estado previo.", e.getMessage());
+            // En caso de error de red, mantenemos la caché como válida para no bloquear al cliente
+            fechaProximaValidacion = LocalDateTime.now().plusMinutes(5); // Reintentar en 5 min
         }
     }
 
     private void actualizarCache(boolean estado) {
         cacheValida = estado;
-        // Establecemos cuándo será la próxima vez que obligaremos a validar de verdad
         fechaProximaValidacion = LocalDateTime.now().plusMinutes(MINUTOS_CACHE);
     }
 

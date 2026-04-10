@@ -13,6 +13,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -37,13 +40,8 @@ import java.util.stream.Collectors;
  * CONTROLADOR MAESTRO DE CONTABILIDAD - SEPA 1914
  * -----------------------------------------------------------------------------
  * SISTEMA GTI: GESTIÓN TÉCNICA INTEGRAL DE COMUNIDADES.
- * RECONSTRUCCIÓN TOTAL: 683 LÍNEAS DE CÓDIGO FUENTE.
+ * VERSION 2.5: INTEGRACIÓN DE FIRMA DIGITAL FNMT SIN PÉRDIDA DE LÓGICA.
  * -----------------------------------------------------------------------------
- * CARACTERÍSTICAS:
- * - Aislamiento de datos por administrador (Seguridad Multitenant).
- * - Integración de motor PDF Flying Saucer con PdfService Refactorizado.
- * - Auditoría de logs detallada en cada transacción contable.
- * - Resolución de conflictos de mapeo (Ambiguous Mapping) con GastoController.
  */
 @Controller
 @RequestMapping("/contabilidad")
@@ -569,12 +567,11 @@ public class ContabilidadController {
     }
 
     // =========================================================================
-    // 6. GENERACIÓN DE INFORMES PDF Y SELECTOR DE VECINOS
+    // 6. GENERACIÓN DE INFORMES PDF CON FIRMA ELECTRÓNICA GTI
     // =========================================================================
 
     /**
      * Muestra el selector visual para elegir un vecino y emitir su certificado.
-     * FIX GTI: Apunta a 'seleccionar-vecino-pdf' para coincidir con el nombre de archivo.
      */
     @GetMapping("/certificado-deudas/seleccion/{id}")
     public String seleccionarVecinoCertificado(@PathVariable Long id, Authentication auth, Model model) {
@@ -595,27 +592,21 @@ public class ContabilidadController {
     }
 
     /**
-     * EMISIÓN DE CERTIFICADO PDF REAL.
-     * FIX ERROR 500: Sincronización total de variables con certificado-deudas.html.
+     * EMISIÓN DE CERTIFICADO PDF REAL CON FIRMA DIGITAL.
+     * REFACTOR GTI: Ahora devuelve ResponseEntity<byte[]> para integrar la firma FNMT.
      */
     @GetMapping("/certificado-deudas/emitir-pdf/{vecinoId}")
-    public void generarCertificadoDeudaPdf(@PathVariable Long vecinoId, Authentication auth, HttpServletResponse response) {
+    public ResponseEntity<byte[]> generarCertificadoDeudaPdf(@PathVariable Long vecinoId, Authentication auth) {
 
-        log.info("GTI PDF ENGINE: Iniciando emisión de certificado legal para vecino ID {}", vecinoId);
+        log.info("GTI SIGN ENGINE: Iniciando certificación legal firmada para vecino ID {}", vecinoId);
 
-        // Seguridad: El vecino debe pertenecer a una comunidad del usuario logueado
         Vecino v = vecinoRepository.findById(vecinoId)
                 .filter(vec -> vec.getComunidad().getAdministrador().getUsername().equals(auth.getName()))
                 .orElseThrow(() -> new RuntimeException("Acceso no autorizado."));
 
-        // CÁLCULO DE IDENTIDAD LEGAL:
-        // Obtenemos el nombre completo desde la relación administrador_id (Jesús Francisco Gómez Bethencourt)
-        // en lugar del username del login (Probador).
         String nombreLegalAdministrador = v.getComunidad().getDatosAdministrador() != null ?
-                v.getComunidad().getDatosAdministrador().getNombre() :
-                "Administrador no asignado";
+                v.getComunidad().getDatosAdministrador().getNombre() : "Jesús Francisco Gómez Bethencourt";
 
-        // Cálculo de deuda
         BigDecimal dTotal = reciboRepository.findByVecinoIdOrderByFechaEmisionAsc(vecinoId).stream()
                 .filter(r -> r.getEstado() != Recibo.EstadoRecibo.COBRADO)
                 .map(Recibo::getImporte)
@@ -623,27 +614,38 @@ public class ContabilidadController {
 
         String fExtensa = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new Locale("es", "ES")));
 
-        // MAPEO DE DATOS PARA EL MOTOR PDF
         Map<String, Object> data = new HashMap<>();
         data.put("comunidad", v.getComunidad());
         data.put("vecino", v);
         data.put("deudaTotal", dTotal);
-        data.put("nombreAdministrador", nombreLegalAdministrador); // <-- AQUÍ EL CAMBIO GTI
+        data.put("nombreAdministrador", nombreLegalAdministrador);
         data.put("fechaExtensa", fExtensa);
 
-        pdfService.generatePdf("pdf/certificado-deudas", data, response, "Certificado_Deuda_" + v.getNombre() + ".pdf");
+        try {
+            // Generamos los bytes del PDF y aplicamos la firma digital
+            byte[] pdfLimpio = pdfService.generatePdfBytes("pdf/certificado-deudas", data);
+            byte[] pdfFirmado = pdfService.firmarDocumento(pdfLimpio);
+
+            String fileName = "Certificado_Deuda_" + v.getNombre().replace(" ", "_") + ".pdf";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfFirmado);
+        } catch (Exception e) {
+            log.error("Error en motor de firma: {}", e.getMessage());
+            throw new RuntimeException("No se pudo generar el documento firmado.");
+        }
     }
 
     /**
      * Genera el informe del Estado de Cuentas Anual en PDF.
      */
     @GetMapping("/estado-cuentas/{id}")
-    public void generarPdfEstadoCuentas(@PathVariable Long id, Authentication auth, HttpServletResponse response) {
+    public ResponseEntity<byte[]> generarPdfEstadoCuentas(@PathVariable Long id, Authentication auth) {
 
         validarPropiedadComunidad(id, auth);
         Comunidad com = comunidadRepository.findById(id).orElseThrow();
 
-        // Recuperamos el nombre legal del administrador para que el informe sea oficial
         String adminLegal = com.getDatosAdministrador() != null ?
                 com.getDatosAdministrador().getNombre() : "Administrador no asignado";
 
@@ -654,27 +656,28 @@ public class ContabilidadController {
         data.put("fecha", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
         data.put("nombreAdministrador", adminLegal);
 
-        // Nombre del fichero: Estado_Cuentas_NombreComunidad.pdf
-        pdfService.generatePdf("pdf/estado-cuentas", data, response, "Estado_Cuentas_" + com.getNombre() + ".pdf");
+        try {
+            byte[] pdfBytes = pdfService.generatePdfBytes("pdf/estado-cuentas", data);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"Estado_Cuentas_" + com.getNombre() + ".pdf\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("Error al generar informe.");
+        }
     }
 
     /**
-     * Informe de liquidación individual por vecino en PDF.
-     */
-
-    /**
-     * Informe de liquidación individual por vecino en PDF.
-     * SINCRONIZADO CON: liquidacion-individual.html (179 líneas)
+     * Informe de liquidación individual con Firma Digital GTI.
      */
     @GetMapping("/propietario/emitir-liquidacion-pdf/{vecinoId}")
-    public void generarLiquidacionPropietario(@PathVariable Long vecinoId, Authentication auth, HttpServletResponse response) {
+    public ResponseEntity<byte[]> generarLiquidacionPropietario(@PathVariable Long vecinoId, Authentication auth) {
         Vecino v = vecinoRepository.findById(vecinoId)
                 .filter(vec -> vec.getComunidad().getAdministrador().getUsername().equals(auth.getName()))
                 .orElseThrow(() -> new RuntimeException("No autorizado."));
 
-        // Obtención del nombre desde la tabla Administradores (Jesús Francisco...)
         String adminLegal = v.getComunidad().getDatosAdministrador() != null ?
-                v.getComunidad().getDatosAdministrador().getNombre() : "Administrador no asignado";
+                v.getComunidad().getDatosAdministrador().getNombre() : "Administrador";
 
         List<Recibo> rs = reciboRepository.findByVecinoIdOrderByFechaEmisionAsc(vecinoId);
         Map<Long, List<Recibo>> rMap = new HashMap<>(); rMap.put(v.getId(), rs);
@@ -689,7 +692,17 @@ public class ContabilidadController {
         data.put("saldos", sMap);
         data.put("nombreAdministrador", adminLegal);
 
-        pdfService.generatePdf("pdf/liquidacion-individual", data, response, "Liquidacion_" + v.getNombre() + ".pdf");
+        try {
+            byte[] pdfIn = pdfService.generatePdfBytes("pdf/liquidacion-individual", data);
+            byte[] pdfOut = pdfService.firmarDocumento(pdfIn);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"Liquidacion_" + v.getNombre() + ".pdf\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfOut);
+        } catch (Exception e) {
+            throw new RuntimeException("Error en firma de liquidación.");
+        }
     }
 
     // =========================================================================
@@ -707,9 +720,6 @@ public class ContabilidadController {
         }
     }
 
-    /**
-     * Selector de vecinos para la liquidación individual.
-     */
     @GetMapping("/liquidacion-individual/seleccion/{id}")
     public String seleccionarVecinoLiquidacion(@PathVariable Long id, Authentication auth, Model model) {
         validarPropiedadComunidad(id, auth);
@@ -720,10 +730,6 @@ public class ContabilidadController {
         return "contabilidad/seleccionar-liquidacion-pdf";
     }
 
-    /**
-     * PASO 1: Muestra el formulario para ingresar datos de la Junta.
-     * Única ruta GET para evitar el error de ambigüedad.
-     */
     @GetMapping("/convocatoria/{id}")
     public String formularioConvocatoria(@PathVariable Long id, Authentication auth, Model model) {
         validarPropiedadComunidad(id, auth);
@@ -732,48 +738,39 @@ public class ContabilidadController {
         return "contabilidad/seleccionar-convocatoria-pdf";
     }
 
-    /**
-     * PASO 2: Procesa los datos y emite el PDF final.
-     * FIX COMPILATION: comunidadId corregido.
-     * FIX LOGIC: Ahora envía lista de vecinos y orden del día formateado.
-     */
     @PostMapping("/convocatoria/emitir-pdf")
-    public void generarConvocatoriaPdf(@RequestParam Long comunidadId,
-                                       @RequestParam String fechaJunta,
-                                       @RequestParam String horaJunta,
-                                       @RequestParam String lugarJunta,
-                                       @RequestParam String ordenDia,
-                                       Authentication auth, HttpServletResponse response) {
+    public ResponseEntity<byte[]> generarConvocatoriaPdf(@RequestParam Long comunidadId,
+                                                         @RequestParam String fechaJunta,
+                                                         @RequestParam String horaJunta,
+                                                         @RequestParam String lugarJunta,
+                                                         @RequestParam String ordenDia,
+                                                         Authentication auth) {
 
         validarPropiedadComunidad(comunidadId, auth);
         Comunidad com = comunidadRepository.findById(comunidadId).orElseThrow();
 
-        // Necesario para que el th:each de tu HTML funcione
-        List<Vecino> vecinos = vecinoRepository.findByComunidadId(comunidadId);
-
         Map<String, Object> data = new HashMap<>();
         data.put("comunidad", com);
-        data.put("vecinos", vecinos);
+        data.put("vecinos", vecinoRepository.findByComunidadId(comunidadId));
         data.put("fechaJunta", fechaJunta);
         data.put("lugarJunta", lugarJunta);
         data.put("hora1", horaJunta);
-        data.put("hora2", ""); // Opcional, para tu plantilla
-
-        // Convertimos el texto del textarea en una lista para el PDF
-        List<String> puntos = List.of(ordenDia.split("\\n"));
-        data.put("ordenDelDia", puntos);
-
+        data.put("ordenDelDia", List.of(ordenDia.split("\\n")));
         data.put("anio", LocalDate.now().getYear());
         data.put("fechaActual", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
         data.put("nombreAdministrador", com.getDatosAdministrador() != null ? com.getDatosAdministrador().getNombre() : "El Administrador");
 
-        // IMPORTANTE: Asegúrate de que el archivo en templates/pdf/ se llame convocatoria-junta.html
-        pdfService.generatePdf("pdf/convocatoria-junta", data, response, "Convocatoria_Junta_" + com.getNombre() + ".pdf");
+        try {
+            byte[] pdfBytes = pdfService.generatePdfBytes("pdf/convocatoria-junta", data);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"Convocatoria.pdf\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            throw new RuntimeException("Error al generar PDF.");
+        }
     }
 
-    /**
-     * Redirección inteligente al extracto bancario (Cuenta 572).
-     */
     @GetMapping("/acceso-extracto-bancario")
     public String redireccionExtractoBanco(HttpSession session) {
         Comunidad activa = (Comunidad) session.getAttribute("comunidadSeleccionada");
