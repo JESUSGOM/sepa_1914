@@ -1,5 +1,6 @@
 package com.sepa1914.adminservice.model;
 
+import com.sepa1914.adminservice.util.AesEncryptor;
 import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +23,8 @@ public class Comunidad {
     @Column(name = "nombre", length = 70, nullable = false)
     private String nombre;
 
-    @Column(name = "identificador_acreedor", length = 35, nullable = false)
+    @Convert(converter = AesEncryptor.class)
+    @Column(name = "identificador_acreedor", length = 255, nullable = false)
     private String identificadorAcreedor;
 
     /**
@@ -32,7 +34,8 @@ public class Comunidad {
     @Column(name = "tipo_reparto", length = 20)
     private TipoReparto tipoReparto = TipoReparto.PARTES_IGUALES;
 
-    @Column(name = "iban", length = 34, nullable = false)
+    @Convert(converter = AesEncryptor.class) // Corregido: converter y Encryptor
+    @Column(name = "iban", length = 255, nullable = false)
     private String iban;
 
     @Column(name = "direccion", length = 100)

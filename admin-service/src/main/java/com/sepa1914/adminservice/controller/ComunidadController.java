@@ -3,6 +3,7 @@ package com.sepa1914.adminservice.controller;
 import com.sepa1914.adminservice.model.*;
 import com.sepa1914.adminservice.repository.*;
 import com.sepa1914.adminservice.service.*;
+import com.sepa1914.adminservice.util.EncryptionUtil;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -258,6 +259,27 @@ public class ComunidadController {
                 .body(data);
     }
 
+    @GetMapping("/informe-global-pdf")
+    public ResponseEntity<byte[]> descargarInformeGlobal(Authentication auth) {
+        Usuario actual = getUsuarioLogueado(auth);
+        List<Comunidad> misComunidades = comunidadRepository.findByAdministrador(actual);
+
+        try {
+            // Utilizamos el pdfService ya inyectado en tu controlador
+            byte[] pdfContent = pdfService.generarInformeGlobal(misComunidades);
+
+            String nombreArchivo = "INFORME_GLOBAL_" + LocalDate.now() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombreArchivo + "\"")
+                    .body(pdfContent);
+        } catch (Exception e) {
+            log.error("Error al generar el informe global: ", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     private String normalizarNombreFichero(String nombre) {
         if (nombre == null) return "COMUNIDAD";
         String temp = java.text.Normalizer.normalize(nombre, java.text.Normalizer.Form.NFD);
@@ -267,4 +289,28 @@ public class ComunidadController {
     private Usuario getUsuarioLogueado(Authentication auth) {
         return usuarioRepository.findByUsername(auth.getName()).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
+
+//    @GetMapping("/migrar-comunidades-seguras")
+//    @ResponseBody
+//    public String migrarComunidades() {
+//        try {
+//            List<Comunidad> lista = comunidadRepository.findAll();
+//            int procesados = 0;
+//            for (Comunidad c : lista) {
+//                // Verificamos longitud para no re-encriptar
+//                if (c.getIban() != null && c.getIban().length() < 30) {
+//                    if (c.getIdentificadorAcreedor() != null)
+//                        c.setIdentificadorAcreedor(EncryptionUtil.encrypt(c.getIdentificadorAcreedor()));
+//                    if (c.getIban() != null)
+//                        c.setIban(EncryptionUtil.encrypt(c.getIban()));
+//
+//                    comunidadRepository.save(c);
+//                    procesados++;
+//                }
+//            }
+//            return "ÉXITO: Se han blindado " + procesados + " comunidades.";
+//        } catch (Exception e) {
+//            return "Error: " + e.getMessage();
+//        }
+//    }
 }

@@ -46,12 +46,42 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                             <tr>
-                                <th class="ps-4">Viv/Local</th>
-                                <th>Nombre del Propietario</th>
-                                <th>NIF/CIF</th>
-                                <th>Cobro</th>
-                                <th class="text-center">Coeficiente %</th>
-                                <th class="text-end pe-4">Gestión</th>
+                                <th class="ps-4">
+                                    <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id}, sortField='vivienda', sortDir=${reverseSortDir})}" class="text-decoration-none text-dark d-flex align-items-center">
+                                        Viv/Local
+                                        <i th:if="${sortField == 'vivienda'}" th:class="${sortDir == 'asc' ? 'bi bi-arrow-up ms-1' : 'bi bi-arrow-down ms-1'}"></i>
+                                    </a>
+                                </th>
+
+                                <th>
+                                    <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id}, sortField='nombre', sortDir=${reverseSortDir})}" class="text-decoration-none text-dark d-flex align-items-center">
+                                        Nombre del Propietario
+                                        <i th:if="${sortField == 'nombre'}" th:class="${sortDir == 'asc' ? 'bi bi-arrow-up ms-1' : 'bi bi-arrow-down ms-1'}"></i>
+                                    </a>
+                                </th>
+
+                                <th>
+                                    <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id}, sortField='nif', sortDir=${reverseSortDir})}" class="text-decoration-none text-dark d-flex align-items-center">
+                                        NIF/CIF
+                                        <i th:if="${sortField == 'nif'}" th:class="${sortDir == 'asc' ? 'bi bi-arrow-up ms-1' : 'bi bi-arrow-down ms-1'}"></i>
+                                    </a>
+                                </th>
+
+                                <th>
+                                    <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id}, sortField='domiciliado', sortDir=${reverseSortDir})}" class="text-decoration-none text-dark d-flex align-items-center">
+                                        Cobro
+                                        <i th:if="${sortField == 'domiciliado'}" th:class="${sortDir == 'asc' ? 'bi bi-arrow-up ms-1' : 'bi bi-arrow-down ms-1'}"></i>
+                                    </a>
+                                </th>
+
+                                <th class="text-center">
+                                    <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id}, sortField='coeficiente', sortDir=${reverseSortDir})}" class="text-decoration-none text-dark d-flex justify-content-center align-items-center">
+                                        Coeficiente %
+                                        <i th:if="${sortField == 'coeficiente'}" th:class="${sortDir == 'asc' ? 'bi bi-arrow-up ms-1' : 'bi bi-arrow-down ms-1'}"></i>
+                                    </a>
+                                </th>
+
+                                <th class="text-end pe-4 text-muted">Gestión</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -86,8 +116,7 @@
                                         <a th:if="${v.iban != null and !#strings.isEmpty(v.iban)}"
                                            th:href="@{/vecinos/mandato-pdf/{id}(id=${v.id})}"
                                            class="btn btn-sm btn-outline-danger"
-                                           title="Descargar Mandato SEPA para Firma"
-                                           target="_blank">
+                                           title="Guardar Mandato SEPA en Disco Local">
                                             <i class="bi bi-file-earmark-check"></i>
                                         </a>
 
@@ -124,6 +153,13 @@
                     </div>
                 </div>
             </div>
+
+            <div class="d-flex justify-content-end mt-4 mb-5 pe-2">
+                <a th:href="@{/comunidades/lista}" class="btn btn-secondary shadow-sm px-4">
+                    <i class="bi bi-arrow-left-circle me-1"></i> Volver al Listado de Comunidades
+                </a>
+            </div>
+
         </main>
     </div>
 </div>

@@ -11,6 +11,7 @@ import com.sepa1914.adminservice.service.BankService;
 import com.sepa1914.adminservice.service.ContabilidadService;
 import com.sepa1914.adminservice.service.PdfService;
 import com.sepa1914.adminservice.service.StorageService;
+import com.sepa1914.adminservice.util.EncryptionUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -85,6 +86,8 @@ public class VecinoController {
             @RequestParam(required = false) Long comunidadId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "nombre") String sortField,
+            @RequestParam(defaultValue = "asc") String sortDir,
             Model model,
             Authentication auth) {
 
@@ -98,15 +101,26 @@ public class VecinoController {
             return "redirect:/comunidades/lista?error=no_autorizado";
         }
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("nombre").ascending());
+        // 1. Lógica dinámica: Si el usuario pide 'asc', ordenamos ascendente; si no, descendente.
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name())
+                ? Sort.by(sortField).ascending()
+                : Sort.by(sortField).descending();
+
+        // 2. Creamos la petición de página usando el objeto 'sort' que acabamos de configurar
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        // 3. Buscamos en la base de datos (Spring Data JPA ya sabe qué hacer con ese 'sort')
         Page<Vecino> vecinosPage = vecinoRepository.findByComunidad(comunidad, pageable);
 
         model.addAttribute("activePage", "vecinos");
         model.addAttribute("comunidad", comunidad);
-        model.addAttribute("vecinos", vecinosPage.getContent());
+        model.addAttribute("vecinos", vecinosPage);
         model.addAttribute("currentPage", page);
         model.addAttribute("totalPages", vecinosPage.getTotalPages());
         model.addAttribute("totalItems", vecinosPage.getTotalElements());
+        model.addAttribute("sortField", sortField);
+        model.addAttribute("sortDir", sortDir);
+        model.addAttribute("reverseSortDir", sortDir.equals("asc") ? "desc" : "asc");
 
         return "vecinos-lista";
     }
@@ -189,32 +203,34 @@ public class VecinoController {
     }
 
     /**
-     * MÉTDO CORREGIDO: Mapeo para descargar el Mandato SEPA en PDF.
-     * Ajustado a /mandato-pdf/{id} para coincidir con el botón del HTML.
+     * MÉTDO REFACTORIZADO: Realiza un guardado SILENCIOSO en el disco duro.
+     * No abre pestañas nuevas ni genera descarga en el navegador.
      */
     @GetMapping("/mandato-pdf/{id}")
-    public ResponseEntity<byte[]> descargarMandato(@PathVariable Long id, Authentication auth) {
+    public String descargarMandato(@PathVariable Long id, Authentication auth, RedirectAttributes ra) {
         try {
             Vecino vecino = vecinoRepository.findById(id).orElseThrow();
 
             if (!vecino.getComunidad().getAdministrador().getUsername().equals(auth.getName())) {
-                return ResponseEntity.status(403).build();
+                return "redirect:/comunidades/lista?error=no_autorizado";
             }
 
             if (vecino.getIban() == null || vecino.getIban().isBlank()) {
-                return ResponseEntity.badRequest().build();
+                ra.addFlashAttribute("error", "El vecino no tiene IBAN configurado.");
+                return "redirect:/vecinos/lista?comunidadId=" + vecino.getComunidad().getId();
             }
 
-            byte[] pdf = pdfService.generarMandatoSepa(vecino.getComunidad(), vecino);
-            String nombreFichero = "MANDATO_SEPA_" + vecino.getNombre().replaceAll("\\s+", "_").toUpperCase() + ".pdf";
+            // 1. El servicio genera y GUARDA el archivo en C:\sepa1914\ficheros\mandatos\...
+            pdfService.generarMandatoSepaLocal(vecino.getComunidad(), vecino);
 
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombreFichero + "\"")
-                    .contentType(MediaType.APPLICATION_PDF)
-                    .body(pdf);
+            // 2. Notificamos al usuario y recargamos la lista actual
+            ra.addFlashAttribute("mensaje", "Mandato de " + vecino.getNombre() + " guardado correctamente en la carpeta local.");
+            return "redirect:/vecinos/lista?comunidadId=" + vecino.getComunidad().getId();
+
         } catch (Exception e) {
-            log.error("Error en generación de mandato PDF: {}", e.getMessage());
-            return ResponseEntity.internalServerError().build();
+            log.error("Error en proceso de mandato local: {}", e.getMessage());
+            ra.addFlashAttribute("error", "Error al procesar el guardado físico.");
+            return "redirect:/vecinos/lista?comunidadId=" + id;
         }
     }
 
@@ -288,4 +304,57 @@ public class VecinoController {
         String resultado = cifC + ceros + idProp + nifV;
         return resultado.length() > 35 ? resultado.substring(0, 35) : resultado;
     }
+
+//    @GetMapping("/migrar-ahora-mismo")
+//    @ResponseBody
+//    public String encriptarVecinosExistentes() {
+//        try {
+//            List<Vecino> lista = vecinoRepository.findAll();
+//            int procesados = 0;
+//
+//            for (Vecino v : lista) {
+//                // Solo encriptamos si no parece ya encriptado (evita doble encriptación)
+//                // Un dato encriptado por tu EncryptionUtil suele terminar en '=' o ser muy largo
+//                if (v.getNif() != null && !v.getNif().contains("==") && v.getNif().length() < 20) {
+//                    if (v.getNif() != null) v.setNif(EncryptionUtil.encrypt(v.getNif()));
+//                    if (v.getEmail() != null) v.setEmail(EncryptionUtil.encrypt(v.getEmail()));
+//                    if (v.getIban() != null) v.setIban(EncryptionUtil.encrypt(v.getIban()));
+//                    if (v.getBic() != null) v.setBic(EncryptionUtil.encrypt(v.getBic()));
+//
+//                    vecinoRepository.save(v);
+//                    procesados++;
+//                }
+//            }
+//            return "Éxito: Se han encriptado " + procesados + " vecinos de los 197 totales.";
+//        } catch (Exception e) {
+//            return "Error en la migración: " + e.getMessage();
+//        }
+//    }
+
+//    @GetMapping("/migrar-comunidades-ahora")
+//    @ResponseBody
+//    public String migrarComunidadesSeguras() {
+//        try {
+//            List<Comunidad> comunidades = comunidadRepository.findAll();
+//            int contador = 0;
+//
+//            for (Comunidad c : comunidades) {
+//                // Solo encriptamos si el IBAN no parece ya encriptado (longitud corta)
+//                if (c.getIban() != null && c.getIban().length() < 30) {
+//
+//                    if (c.getIdentificadorAcreedor() != null)
+//                        c.setIdentificadorAcreedor(EncryptionUtil.encrypt(c.getIdentificadorAcreedor()));
+//
+//                    if (c.getIban() != null)
+//                        c.setIban(EncryptionUtil.encrypt(c.getIban()));
+//
+//                    comunidadRepository.save(c);
+//                    contador++;
+//                }
+//            }
+//            return "ÉXITO: Se han blindado " + contador + " comunidades con éxito.";
+//        } catch (Exception e) {
+//            return "ERROR EN MIGRACIÓN DE COMUNIDADES: " + e.getMessage();
+//        }
+//    }
 }

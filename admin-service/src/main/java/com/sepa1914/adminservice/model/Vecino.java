@@ -1,5 +1,6 @@
 package com.sepa1914.adminservice.model;
 
+import com.sepa1914.adminservice.util.AesEncryptor;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -30,9 +31,11 @@ public class Vecino {
     @Column(length = 20)
     private String telefono_3;
 
+    @Convert(converter = AesEncryptor.class)
     @Column(length = 150)
     private String email;
 
+    @Convert(converter = AesEncryptor.class)
     @Column(name = "nif", nullable = false, length = 20)
     private String nif;
 
@@ -48,9 +51,11 @@ public class Vecino {
     @Column(name = "direccion_notificacion", length = 200)
     private String direccionNotificacion;
 
+    @Convert(converter = AesEncryptor.class)
     @Column(length = 34)
     private String iban;
 
+    @Convert(converter = AesEncryptor.class)
     @Column(length = 11)
     private String bic;
 

@@ -89,7 +89,7 @@ public class SepaService {
 
         // --- FASE 2: PDF Y EMAIL (Turbo Paralelo - Sin tocar la Base de Datos) ---
         log.info("⚡ GTI TURBO: Procesando {} deudores en paralelo...", tareas.size());
-        tareas.parallelStream().forEach(task -> {
+        tareas.stream().forEach(task -> {
             Vecino v = task.vecino;
             try {
                 String nombreFicheroPdf = v.getNif() + "_" + v.getVivienda() + "_" + mesRemesa + "_" + anioRemesa;

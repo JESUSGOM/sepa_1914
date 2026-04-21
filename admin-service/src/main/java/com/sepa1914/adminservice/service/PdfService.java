@@ -61,6 +61,10 @@ public class PdfService {
     @Value("${app.recibos.pdf.path}")
     private String pdfPath;
 
+    // AÑADIMOS ESTA LÍNEA NUEVA (No borres las anteriores)
+    @Value("${storage.location}")
+    private String storageLocation;
+
     // =========================================================================
     // 1. GENERACIÓN BASADA EN PLANTILLAS THYMELEAF (HTML TO PDF)
     // =========================================================================
@@ -449,5 +453,86 @@ public class PdfService {
         normalizado = DIACRITICS.matcher(normalizado).replaceAll("");
         return NON_ALPHANUMERIC.matcher(normalizado.toUpperCase().replace("Ñ", "N"))
                 .replaceAll("_").replaceAll("_+", "_");
+    }
+
+    /**
+     * Genera un informe global de todas las comunidades gestionadas.
+     * Requerido por ComunidadController para la opción de "Informe General".
+     */
+    public byte[] generarInformeGlobal(List<Comunidad> comunidades) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4, 36, 36, 36, 36);
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
+            Font fontTablaCabecera = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Font.NORMAL, Color.WHITE);
+            Font fontTablaCuerpo = FontFactory.getFont(FontFactory.HELVETICA, 9);
+
+            Paragraph pTitulo = new Paragraph("INFORME GLOBAL DE COMUNIDADES GESTIONADAS", fontTitulo);
+            pTitulo.setAlignment(Element.ALIGN_CENTER);
+            pTitulo.setSpacingAfter(20);
+            document.add(pTitulo);
+
+            PdfPTable table = new PdfPTable(new float[]{4f, 2f, 4f});
+            table.setWidthPercentage(100);
+
+            String[] headers = {"NOMBRE COMUNIDAD", "CIF/NIF", "DIRECCIÓN"};
+            for (String h : headers) {
+                PdfPCell cell = new PdfPCell(new Phrase(h, fontTablaCabecera));
+                cell.setBackgroundColor(Color.DARK_GRAY);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                cell.setPadding(5);
+                table.addCell(cell);
+            }
+
+            for (Comunidad c : comunidades) {
+                table.addCell(new Phrase(c.getNombre(), fontTablaCuerpo));
+                table.addCell(new Phrase(c.getIdentificadorAcreedor(), fontTablaCuerpo));
+                table.addCell(new Phrase(c.getDireccion() + " (" + c.getPoblacion() + ")", fontTablaCuerpo));
+            }
+
+            document.add(table);
+            document.close();
+            return out.toByteArray();
+        } catch (Exception e) {
+            log.error("Error al generar informe global PDF: {}", e.getMessage());
+            throw new RuntimeException("Error en informe global.");
+        }
+    }
+
+    /**
+     * Genera el mandato SEPA y guarda una copia física organizada por carpetas de comunidad.
+     */
+    public byte[] generarMandatoSepaLocal(Comunidad comunidad, Vecino vecino) {
+        try {
+            // Generamos los bytes del PDF usando el método que ya tienes
+            byte[] pdfBytes = generarMandatoSepa(comunidad, vecino);
+
+            // 1. Creamos la ruta de la comunidad: base/NOMBRE_COMUNIDAD
+            String nombreCarpetaComunidad = normalizarParaFichero(comunidad.getNombre());
+            java.io.File carpetaComunidad = new java.io.File(storageLocation + java.io.File.separator + nombreCarpetaComunidad);
+
+            if (!carpetaComunidad.exists() && carpetaComunidad.mkdirs()) {
+                log.info("GTI FS: Creada nueva carpeta para comunidad: {}", nombreCarpetaComunidad);
+            }
+
+            // 2. Definimos el nombre del fichero
+            String nombreFichero = "MANDATO_SEPA_" + normalizarParaFichero(vecino.getNombre()) + ".pdf";
+            java.io.File ficheroFinal = new java.io.File(carpetaComunidad, nombreFichero);
+
+            // 3. Guardamos físicamente en el disco
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(ficheroFinal)) {
+                fos.write(pdfBytes);
+            }
+            log.info("GTI FS: Mandato guardado localmente en: {}", ficheroFinal.getAbsolutePath());
+
+            return pdfBytes;
+        } catch (Exception e) {
+            log.error("Error al guardar copia local del mandato: {}", e.getMessage());
+            // Si falla el guardado en disco, devolvemos el PDF normal para no bloquear al usuario
+            return generarMandatoSepa(comunidad, vecino);
+        }
     }
 }

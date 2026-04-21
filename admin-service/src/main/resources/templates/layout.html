@@ -3,8 +3,8 @@
 <head th:fragment="head">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SEPA 1914 - Gestión de Fincas y Contabilidad</title>
-    <link rel="icon" type="image/jpeg" th:href="@{/images/logo.jpg}">
+    <title>GOMBETH URBAN - Gestión de Fincas y Contabilidad</title>
+    <link rel="icon" type="image/png" th:href="@{/images/logo.png}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
@@ -12,8 +12,8 @@
 
         /* --- OPTIMIZACIÓN GTI: SIDEBAR CON SCROLL INDEPENDIENTE --- */
         .sidebar {
-            height: 100vh; /* Altura total de la ventana */
-            overflow-y: auto; /* Solo el menú hace scroll si el contenido excede la altura */
+            height: 100vh;
+            overflow-y: auto;
             position: sticky;
             top: 0;
             background-color: #212529 !important;
@@ -23,7 +23,6 @@
             z-index: 1000;
         }
 
-        /* Personalización del scrollbar del menú (Estilo F1) */
         .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-thumb { background: #495057; border-radius: 10px; }
         .sidebar::-webkit-scrollbar-track { background: #212529; }
@@ -96,17 +95,24 @@
         <div th:if="${softwareActivado == false}" class="px-3">
             <div class="license-banner shadow-sm">
                 <i class="bi bi-shield-lock-fill me-1"></i> <strong>MODO EVALUACIÓN</strong>
-                <p class="mb-0 mt-1 opacity-75 small">Generación SEPA bloqueada. Facilite este ID para activar:</p>
+                <p class="mb-0 mt-1 opacity-75 small">Facilite este ID para activar:</p>
                 <span class="license-id" th:text="${equipoID}">0000-0000-0000-0000</span>
             </div>
         </div>
 
-        <div class="px-3 mb-4">
-            <h5 class="text-white border-bottom pb-2">
-                <i class="bi bi-bank2 me-2"></i> SEPA 1914
-            </h5>
-            <div th:if="${session.comunidadSeleccionada}" class="mt-2">
-                <span class="badge bg-primary w-100 text-start p-2">
+        <div class="px-3 mb-4 text-center">
+            <div class="d-inline-block position-relative mb-2">
+                <i class="bi bi-shield-fill text-primary" style="font-size: 3.5rem; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.5));"></i>
+                <div class="position-absolute top-50 start-50 translate-middle text-white fw-bold"
+                     style="font-size: 0.65rem; line-height: 0.9; text-transform: uppercase; width: 100%;">
+                    Gombeth<br>Urban
+                </div>
+            </div>
+            <h6 class="text-white-50 small fw-bold mt-1 text-uppercase" style="letter-spacing: 2px;">SEPA 1914</h6>
+            <div class="sidebar-divider mt-2"></div>
+
+            <div th:if="${session.comunidadSeleccionada}" class="mt-2 text-start">
+                <span class="badge bg-primary w-100 text-start p-2 shadow-sm">
                     <i class="bi bi-buildings-fill me-1"></i>
                     <span th:text="${session.comunidadSeleccionada.nombre}">Comunidad Activa</span>
                 </span>
@@ -239,6 +245,12 @@
                     <a class="nav-link text-white" th:href="@{/contabilidad/convocatoria/{id}(id=${session.comunidadSeleccionada.id})}"
                        th:classappend="${activePage == 'convocatoria' ? 'active' : ''}">
                         <i class="bi bi-megaphone"></i> Convocatoria Junta
+                    </a>
+                </li>
+                <li class="nav-item" th:if="${session.comunidadSeleccionada != null}">
+                    <a class="nav-link text-white" th:href="@{/actas/comunidad/{id}(id=${session.comunidadSeleccionada.id})}"
+                       th:classappend="${activePage == 'actas' ? 'active' : ''}">
+                        <i class="bi bi-file-earmark-text"></i> Actas de Reuniones
                     </a>
                 </li>
                 <li class="nav-item">
