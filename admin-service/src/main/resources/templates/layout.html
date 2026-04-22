@@ -169,9 +169,11 @@
             <div class="sidebar-heading mt-3">Tesorería Finca</div>
             <ul class="nav flex-column">
                 <li class="nav-item">
-                    <a class="nav-link text-white" th:href="@{/contabilidad/ver-gastos/{id}(id=${session.comunidadSeleccionada.id})}"
+                    <a class="nav-link text-white"
+                       th:href="@{/contabilidad/gastos/{id}(id=${session.comunidadSeleccionada.id})}"
                        th:classappend="${activePage == 'gastos' ? 'active' : ''}">
-                        <i class="bi bi-file-earmark-text"></i> Facturas y Gastos
+                        <i class="bi bi-receipt-cutoff me-2"></i>
+                        <span>Gestión de Gastos</span>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -247,10 +249,12 @@
                         <i class="bi bi-megaphone"></i> Convocatoria Junta
                     </a>
                 </li>
-                <li class="nav-item" th:if="${session.comunidadSeleccionada != null}">
-                    <a class="nav-link text-white" th:href="@{/actas/comunidad/{id}(id=${session.comunidadSeleccionada.id})}"
+                <li class="nav-item">
+                    <a class="nav-link text-white"
+                       th:href="@{/actas/comunidad/{id}(id=${session.comunidadSeleccionada.id})}"
                        th:classappend="${activePage == 'actas' ? 'active' : ''}">
-                        <i class="bi bi-file-earmark-text"></i> Actas de Reuniones
+                        <i class="bi bi-file-earmark-text me-2"></i>
+                        <span>Actas de Reunión</span>
                     </a>
                 </li>
                 <li class="nav-item">

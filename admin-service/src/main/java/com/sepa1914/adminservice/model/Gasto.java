@@ -40,36 +40,19 @@ public class Gasto {
     @JoinColumn(name = "comunidad_id", nullable = false)
     private Comunidad comunidad;
 
-    // --- VÍNCULO CON EL LIBRO DIARIO ---
-    /**
-     * Almacena el código del asiento generado en 'contabilidad_movimientos'.
-     * Es la clave para que la edición no duplique apuntes.
-     */
-    @Column(name = "numero_asiento", length = 20)
+    @Column(name = "numero_asiento")
     private String numeroAsiento;
 
-    // --- ESTADO DE TESORERÍA ---
     @Column(nullable = false)
     private boolean pagado = false;
 
     @Column(name = "fecha_pago")
     private LocalDate fechaPago;
 
-    // --- CONSTRUCTORES ---
+    @Column(name = "ruta_pdf")
+    private String rutaPdf;
 
     public Gasto() {}
-
-    // --- MÉTODOS DE NEGOCIO ---
-
-    /**
-     * Marca la factura como pagada y registra la fecha de salida de banco.
-     */
-    public void registrarPago(LocalDate fecha) {
-        this.pagado = true;
-        this.fechaPago = fecha;
-    }
-
-    // --- GETTERS Y SETTERS ---
 
     public Long getId() {
         return id;
@@ -159,6 +142,14 @@ public class Gasto {
         this.fechaPago = fechaPago;
     }
 
+    public String getRutaPdf() {
+        return rutaPdf;
+    }
+
+    public void setRutaPdf(String rutaPdf) {
+        this.rutaPdf = rutaPdf;
+    }
+
     // --- MÉTODOS DE UTILIDAD ---
 
     @Override
@@ -174,4 +165,12 @@ public class Gasto {
         return Objects.hash(id);
     }
 
+    /**
+     * Registra el pago del gasto y establece la fecha.
+     * Método de dominio para asegurar consistencia del estado 'pagado'.
+     */
+    public void registrarPago(LocalDate fecha) {
+        this.pagado = true;
+        this.fechaPago = fecha;
+    }
 }
