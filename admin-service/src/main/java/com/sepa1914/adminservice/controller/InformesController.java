@@ -206,7 +206,7 @@ public class InformesController {
         data.put("vecino", vecino);
         data.put("deudaTotal", deudaTotal);
         data.put("nombreAdministrador", nombreFirmaAdmin); // <--- NUEVO: Para que salga tu nombre real
-        data.put("fechaExtensa", LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new Locale("es", "ES"))));
+        data.put("fechaExtensa", LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.of("es", "ES"))));
 
         // 6. Generación del PDF mediante el servicio
         byte[] pdfBytes = pdfService.generarPdfDesdePlantilla("certificado-deudas", data);

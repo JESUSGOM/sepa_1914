@@ -609,10 +609,10 @@ public class ContabilidadController {
 
         BigDecimal dTotal = reciboRepository.findByVecinoIdOrderByFechaEmisionAsc(vecinoId).stream()
                 .filter(r -> r.getEstado() != Recibo.EstadoRecibo.COBRADO)
-                .map(Recibo::getImporte)
+                .map(r -> r.getImporte() != null ? r.getImporte() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        String fExtensa = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", new Locale("es", "ES")));
+        String fExtensa = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.of("es", "ES")));
 
         Map<String, Object> data = new HashMap<>();
         data.put("comunidad", v.getComunidad());

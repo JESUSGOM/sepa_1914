@@ -12,8 +12,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.xhtmlrenderer.pdf.ITextRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,13 +26,14 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.TextStyle;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.Base64;
+import java.nio.file.Files;
 
 import java.security.KeyStore;
 import java.security.PrivateKey;
@@ -56,12 +57,11 @@ public class PdfService {
     private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^A-Z0-9]");
 
     @Autowired
-    private TemplateEngine templateEngine;
+    private SpringTemplateEngine templateEngine;
 
     @Value("${app.recibos.pdf.path}")
     private String pdfPath;
 
-    // AÑADIMOS ESTA LÍNEA NUEVA (No borres las anteriores)
     @Value("${storage.location}")
     private String storageLocation;
 
@@ -94,12 +94,32 @@ public class PdfService {
 
     /**
      * MOTOR CENTRAL GTI: Genera el PDF en memoria y devuelve los bytes.
-     * Este método es el que permite que el controlador firme el documento.
+     * Corregido para cargar el logo mediante el CIF (Identificador de Acreedor).
      */
     public byte[] generatePdfBytes(String templateName, Map<String, Object> data) {
         log.debug("GTI PDF_BYTES: Generando array para plantilla {}", templateName);
         try {
             Context context = new Context();
+
+            // CORRECCIÓN DE LOGO: Se usa IdentificadorAcreedor para buscar el archivo .png
+            if (data.containsKey("comunidad")) {
+                Comunidad com = (Comunidad) data.get("comunidad");
+                String cif = com.getIdentificadorAcreedor();
+                if (cif != null) {
+                    try {
+                        File logoFile = new File(storageLocation + File.separator + "logos" + File.separator + cif + ".png");
+                        if (logoFile.exists()) {
+                            byte[] logoBytes = Files.readAllBytes(logoFile.toPath());
+                            String base64Logo = Base64.getEncoder().encodeToString(logoBytes);
+                            data.put("logoBase64", base64Logo);
+                            log.info("GTI LOGO: Cargado logo para CIF {}", cif);
+                        }
+                    } catch (Exception e) {
+                        log.warn("GTI LOGO: No se pudo inyectar el logo Base64: {}", e.getMessage());
+                    }
+                }
+            }
+
             context.setVariables(data);
 
             // Procesar la plantilla HTML a través de Thymeleaf
@@ -140,7 +160,7 @@ public class PdfService {
             data.put("fechaVencimiento", vencimientoReal);
 
             String periodoStr = recibo.getFechaEmision()
-                    .format(DateTimeFormatter.ofPattern("MMMM yyyy", new Locale("es", "ES")))
+                    .format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.of("es", "ES")))
                     .toUpperCase();
             data.put("periodoNombre", periodoStr);
 
@@ -379,12 +399,11 @@ public class PdfService {
     }
 
     // =========================================================================
-    // 3. MOTOR DE FIRMA DIGITAL ELECTRÓNICA (FNMT) - CORREGIDO
+    // 3. MOTOR DE FIRMA DIGITAL ELECTRÓNICA (FNMT)
     // =========================================================================
 
     /**
      * Aplica la firma criptográfica FNMT al documento PDF.
-     * CORRECCIÓN: Se utiliza SELF_SIGNED para compatibilidad con OpenPDF.
      */
     public byte[] firmarDocumento(byte[] pdfIn) {
         String pathCert = "C:/sepa1914/certificados/CertificadoJesus.p12";
@@ -407,12 +426,10 @@ public class PdfService {
             PdfStamper stamper = PdfStamper.createSignature(reader, os, '\0');
             PdfSignatureAppearance appearance = stamper.getSignatureAppearance();
 
-            // Ubicación del recuadro de firma (Ajustado al pie de página)
             appearance.setVisibleSignature(new Rectangle(70, 50, 350, 150), reader.getNumberOfPages(), "FirmaGTI");
             appearance.setReason("Certificación Oficial de la Administración");
             appearance.setLocation("Santa Cruz de Tenerife");
 
-            // Uso de SELF_SIGNED para evitar el error 'Cannot resolve symbol'
             appearance.setCrypto(pk, chain, null, PdfSignatureAppearance.SELF_SIGNED);
 
             stamper.close();
@@ -420,13 +437,10 @@ public class PdfService {
             return os.toByteArray();
         } catch (Exception e) {
             log.error("❌ FALLO CRÍTICO EN FIRMA DIGITAL: {}", e.getMessage());
-            return pdfIn; // Devolvemos el PDF normal para que el usuario no se bloquee
+            return pdfIn;
         }
     }
 
-    /**
-     * Alias del método de firma para mantener compatibilidad con versiones previas.
-     */
     public byte[] aplicarFirmaDigital(byte[] pdfOriginal) throws Exception {
         return firmarDocumento(pdfOriginal);
     }
@@ -455,10 +469,6 @@ public class PdfService {
                 .replaceAll("_").replaceAll("_+", "_");
     }
 
-    /**
-     * Genera un informe global de todas las comunidades gestionadas.
-     * Requerido por ComunidadController para la opción de "Informe General".
-     */
     public byte[] generarInformeGlobal(List<Comunidad> comunidades) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Document document = new Document(PageSize.A4, 36, 36, 36, 36);
@@ -502,15 +512,10 @@ public class PdfService {
         }
     }
 
-    /**
-     * Genera el mandato SEPA y guarda una copia física organizada por carpetas de comunidad.
-     */
     public byte[] generarMandatoSepaLocal(Comunidad comunidad, Vecino vecino) {
         try {
-            // Generamos los bytes del PDF usando el método que ya tienes
             byte[] pdfBytes = generarMandatoSepa(comunidad, vecino);
 
-            // 1. Creamos la ruta de la comunidad: base/NOMBRE_COMUNIDAD
             String nombreCarpetaComunidad = normalizarParaFichero(comunidad.getNombre());
             java.io.File carpetaComunidad = new java.io.File(storageLocation + java.io.File.separator + nombreCarpetaComunidad);
 
@@ -518,11 +523,9 @@ public class PdfService {
                 log.info("GTI FS: Creada nueva carpeta para comunidad: {}", nombreCarpetaComunidad);
             }
 
-            // 2. Definimos el nombre del fichero
             String nombreFichero = "MANDATO_SEPA_" + normalizarParaFichero(vecino.getNombre()) + ".pdf";
             java.io.File ficheroFinal = new java.io.File(carpetaComunidad, nombreFichero);
 
-            // 3. Guardamos físicamente en el disco
             try (java.io.FileOutputStream fos = new java.io.FileOutputStream(ficheroFinal)) {
                 fos.write(pdfBytes);
             }
@@ -531,7 +534,6 @@ public class PdfService {
             return pdfBytes;
         } catch (Exception e) {
             log.error("Error al guardar copia local del mandato: {}", e.getMessage());
-            // Si falla el guardado en disco, devolvemos el PDF normal para no bloquear al usuario
             return generarMandatoSepa(comunidad, vecino);
         }
     }

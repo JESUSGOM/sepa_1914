@@ -1,197 +1,84 @@
-<!DOCTYPE html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>Recibo de Comunidad</title>
-    <style>
-        /* Optimización GTI: Eliminación de peticiones externas y simplificación de renderizado */
+    <style type="text/css">
         @page { size: A4; margin: 0; }
-        body {
-            font-family: 'Helvetica', sans-serif;
-            color: #333;
-            margin: 0;
-            padding: 0;
-            line-height: 1.4;
-            background-color: #ffffff;
-        }
-
-        /* Barra lateral azul estilo GTI */
-        .sidebar {
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 40px;
-            background-color: #0d6efd;
-        }
-
-        .main-content {
-            margin-left: 60px;
-            padding: 40px 50px 40px 20px;
-        }
-
-        /* Cabecera */
+        body { font-family: 'Helvetica', sans-serif; color: #333; margin: 0; padding: 0; line-height: 1.4; }
+        .sidebar { position: absolute; left: 0; top: 0; bottom: 0; width: 35px; background-color: #0d6efd; }
+        .main-content { margin-left: 55px; padding: 40px; }
         .header-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
         .comunidad-info h2 { color: #0d6efd; margin: 0; font-size: 20px; text-transform: uppercase; }
-        .comunidad-info p { margin: 1px 0; font-size: 11px; color: #555; }
-        .recibo-titulo { text-align: right; vertical-align: top; }
-        .titulo-texto { font-size: 26px; font-weight: bold; color: #0d6efd; }
-        .recibo-numero { font-size: 13px; font-weight: bold; color: #444; margin-top: 5px; }
-
-        /* Cuadro de Información del Propietario */
-        .info-box {
-            border: 1px solid #eee;
-            padding: 15px;
-            background-color: #fcfcfc;
-            margin-bottom: 25px;
-        }
-        .info-label { font-size: 9px; color: #0d6efd; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
-        .propietario-nombre { font-size: 16px; font-weight: bold; margin-bottom: 3px; display: block; }
-        .finca-detalle { font-size: 12px; color: #444; }
-
-        /* Badge de Domiciliación */
-        .domiciliacion-badge {
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 10px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        .badge-si { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
-        .badge-no { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
-
-        /* Tabla de Fechas */
-        .dates-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
-        .dates-table th {
-            background-color: #f8f9fa;
-            padding: 8px;
-            border: 1px solid #eee;
-            font-size: 9px;
-            text-align: center;
-            color: #666;
-        }
-        .dates-table td {
-            padding: 10px;
-            border: 1px solid #eee;
-            text-align: center;
-            font-weight: bold;
-            font-size: 13px;
-        }
-
-        /* Tabla de Conceptos */
-        .conceptos-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-        .conceptos-table th {
-            border-bottom: 2px solid #0d6efd;
-            padding: 10px;
-            text-align: left;
-            font-size: 12px;
-            color: #0d6efd;
-        }
-        .conceptos-table td {
-            padding: 12px 10px;
-            border-bottom: 1px solid #f5f5f5;
-            font-size: 12px;
-        }
-        .importe-col { text-align: right; font-weight: bold; }
-
-        /* Cuadro de Total */
-        .total-container { width: 100%; margin-top: 25px; text-align: right; }
-        .total-label { font-weight: bold; font-size: 13px; margin-right: 10px; }
-        .total-amount {
-            display: inline-block;
-            font-size: 22px;
-            font-weight: bold;
-            color: #ffffff;
-            background-color: #0d6efd;
-            padding: 10px 20px;
-            min-width: 120px;
-            text-align: center;
-        }
-
-        /* Pie de página */
-        .footer {
-            margin-top: 60px;
-            border-top: 1px dashed #ddd;
-            padding-top: 15px;
-            font-size: 10px;
-            color: #888;
-        }
-        .footer-system { text-align: center; font-weight: bold; color: #ccc; margin-top: 10px; }
+        .comunidad-info p { margin: 2px 0; font-size: 11px; color: #666; }
+        .recibo-badge { text-align: right; vertical-align: top; }
+        .badge-text { font-size: 26px; font-weight: bold; color: #0d6efd; }
+        .section-title { background-color: #f8f9fa; padding: 8px; border-left: 4px solid #0d6efd; font-weight: bold; font-size: 13px; margin: 20px 0 10px 0; }
+        .info-grid { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .info-grid td { width: 50%; vertical-align: top; border: 1px solid #eee; padding: 15px; }
+        .conceptos-table { width: 100%; border-collapse: collapse; }
+        .conceptos-table th { border-bottom: 2px solid #0d6efd; padding: 10px; text-align: left; font-size: 11px; color: #0d6efd; }
+        .conceptos-table td { padding: 10px; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+        .total-box { text-align: right; margin-top: 30px; padding: 15px; background-color: #f1f8ff; border-radius: 4px; }
+        .total-amount { font-size: 24px; font-weight: bold; color: #0d6efd; }
     </style>
 </head>
 <body>
 <div class="sidebar"></div>
-
 <div class="main-content">
     <table class="header-table">
         <tr>
             <td class="comunidad-info">
-                <h2 th:text="${comunidad.nombre}">COMUNIDAD TEST</h2>
-                <p th:text="'NIF: ' + ${comunidad.identificadorAcreedor}">NIF: H00000000</p>
-                <p th:text="${comunidad.direccion}">Calle de la Comunidad</p>
-                <p th:text="${comunidad.poblacion}">Población</p>
+                <h2 th:text="${comunidad.nombre}">NOMBRE DE LA COMUNIDAD</h2>
+                <p th:text="'CIF: ' + ${comunidad.identificadorAcreedor}">CIF: 00000000X</p>
+                <p th:text="${comunidad.direccion}">Dirección</p>
             </td>
-            <td class="recibo-titulo">
-                <div class="titulo-texto">RECIBO</div>
-                <div class="recibo-numero" th:text="${#temporals.format(recibo.fechaEmision, 'MM/yyyy')}">05/2026</div>
+            <td class="recibo-badge">
+                <div class="badge-text">RECIBO</div>
+                <div style="font-size: 12px;" th:text="${periodoNombre}">MAYO 2026</div>
             </td>
         </tr>
     </table>
 
-    <div class="info-box">
-        <div class="info-label">Titular y Propiedad</div>
-        <span class="propietario-nombre" th:text="${vecino.nombre}">NOMBRE VECINO</span>
-        <span class="finca-detalle" th:text="'Localización: ' + ${vecino.vivienda}">Finca: 1A</span>
-        <br/>
-        <div th:class="${vecino.domiciliado} ? 'domiciliacion-badge badge-si' : 'domiciliacion-badge badge-no'">
-            <span th:text="${vecino.domiciliado} ? 'MODALIDAD: PAGO DOMICILIADO SEPA' : 'MODALIDAD: PAGO MANUAL'">MODALIDAD</span>
-        </div>
-    </div>
-
-    <table class="dates-table">
-        <thead>
+    <div class="section-title">Información del Recibo</div>
+    <table class="info-grid">
         <tr>
-            <th>FECHA EMISIÓN</th>
-            <th>FECHA VENCIMIENTO</th>
-            <th>PERIODO DE COBRO</th>
+            <td>
+                <div style="font-size: 9px; color: #888;">PROPIETARIO</div>
+                <div style="font-weight: bold;" th:text="${vecino.nombre}">NOMBRE VECINO</div>
+                <div th:text="${vecino.vivienda}">Vivienda</div>
+            </td>
+            <td>
+                <div style="font-size: 9px; color: #888;">REFERENCIA</div>
+                <div style="font-weight: bold;" th:text="'ID: ' + ${recibo.id}">ID: 000</div>
+                <div th:text="'Vencimiento: ' + ${#temporals.format(fechaVencimiento, 'dd/MM/yyyy')}">10/05/2026</div>
+            </td>
         </tr>
-        </thead>
-        <tbody>
-        <tr>
-            <td th:text="${#temporals.format(recibo.fechaEmision, 'dd/MM/yyyy')}">01/05/2026</td>
-            <td th:text="${#temporals.format(fechaVencimiento, 'dd/MM/yyyy')}">10/05/2026</td>
-            <td th:text="${periodoNombre}">MAYO 2026</td>
-        </tr>
-        </tbody>
     </table>
 
+    <div class="section-title">Detalle de Conceptos</div>
     <table class="conceptos-table">
         <thead>
         <tr>
-            <th style="width: 75%;">CONCEPTO DETALLADO</th>
-            <th style="width: 25%; text-align: right;">IMPORTE</th>
+            <th style="width: 70%;">DESCRIPCIÓN</th>
+            <th style="width: 30%; text-align: right;">IMPORTE</th>
         </tr>
         </thead>
         <tbody>
         <tr th:each="item : ${detalles}">
-            <td th:text="${item.descripcion}">Cuota Ordinaria</td>
-            <td class="importe-col" th:text="${#numbers.formatDecimal(item.importe, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
+            <td th:text="${item.descripcion}">Descripción concepto</td>
+            <td style="text-align: right; font-weight: bold;" th:text="${#numbers.formatDecimal(item.importe, 1, 2, 'COMMA')} + ' €'">0,00 €</td>
         </tr>
         </tbody>
     </table>
 
-    <div class="total-container">
-        <span class="total-label">LIQUIDO A PAGAR:</span>
-        <div class="total-amount" th:text="${#numbers.formatDecimal(recibo.importe, 1, 2, 'COMMA')} + ' €'">0,00 €</div>
+    <div class="total-box">
+        <span style="font-weight: bold; margin-right: 20px; color: #555;">LÍQUIDO A PAGAR:</span>
+        <span class="total-amount" th:text="${#numbers.formatDecimal(recibo.importe, 1, 2, 'COMMA')} + ' €'">0,00 €</span>
     </div>
 
-    <div class="footer">
-        <p>
-            Nota: Este documento tiene carácter informativo. Si su recibo es domiciliado, el cargo se efectuará en su cuenta a partir
-            de la fecha de vencimiento. Por favor, asegúrese de tener saldo suficiente para evitar gastos de devolución.
-        </p>
-        <p class="footer-system">Sistema GTI - SEPA 1914 | Generación Técnica Integral</p>
+    <div style="margin-top: 50px; font-size: 9px; color: #aaa; text-align: center;">
+        Documento generado automáticamente por SEPA 1914 GTI. Este recibo sirve como justificante de pago.
     </div>
 </div>
 </body>

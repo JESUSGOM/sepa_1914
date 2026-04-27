@@ -3,6 +3,7 @@ package com.sepa1914.adminservice.model;
 import com.sepa1914.adminservice.util.AesEncryptor;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +20,10 @@ public class Vecino {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "comunidad_id", nullable = false)
+    private Comunidad comunidad;
+
     @Column(nullable = false, length = 100)
     private String nombre;
 
@@ -32,41 +37,59 @@ public class Vecino {
     private String telefono_3;
 
     @Convert(converter = AesEncryptor.class)
-    @Column(length = 150)
-    private String email;
-
-    @Convert(converter = AesEncryptor.class)
-    @Column(name = "nif", nullable = false, length = 20)
+    @Column(name = "nif", nullable = false, length = 255)
     private String nif;
 
-    @Column(nullable = false, length = 50)
-    private String vivienda;
-
-    @Column(name = "piso_porton", length = 50)
-    private String pisoPorton;
-
-    @Column(precision = 10, scale = 4)
-    private BigDecimal coeficiente = BigDecimal.ZERO;
-
-    @Column(name = "direccion_notificacion", length = 200)
-    private String direccionNotificacion;
-
     @Convert(converter = AesEncryptor.class)
-    @Column(length = 34)
+    @Column(columnDefinition = "TEXT")
     private String iban;
 
     @Convert(converter = AesEncryptor.class)
-    @Column(length = 11)
+    @Column(columnDefinition = "TEXT")
     private String bic;
+
+    @Column(name = "direccion", length = 50)
+    private String direccion;
+
+    @Column(name = "poblacion", length = 50)
+    private String poblacion;
+
+    @Column(name = "codigopostal", length = 5)
+    private String codigopostal;
+
+    @Column(name = "provincia", length = 40)
+    private String provincia;
+
+    @Column(name = "pais_cod", length = 2)
+    private String pais_cod;
+
+    @Convert(converter = AesEncryptor.class)
+    @Column(length = 150)
+    private String email;
 
     @Column(name = "referencia_mandato", length = 35)
     private String referenciaMandato;
 
+    @Column(name = "piso_porton", length = 50)
+    private String pisoPorton;
+
+    @Column(name = "direccion_notificacion", length = 200)
+    private String direccionNotificacion;
+
     @Column(name = "ruta_mandato_firmado", length = 255)
     private String rutaMandatoFirmado;
 
+    @Column(name = "cuenta_contable_id", length = 255)
+    private Long cuentaContableId;
+
     @Column(name = "cuenta_contable", length = 15)
     private String cuentaContable;
+
+    @Column(nullable = false, length = 50)
+    private String vivienda;
+
+    @Column(precision = 10, scale = 4)
+    private BigDecimal coeficiente = BigDecimal.ZERO;
 
     // LÓGICA DE ESTADOS (Mantenemos boolean primitivo para evitar nulos accidentales)
     @Column(nullable = false)
@@ -81,10 +104,6 @@ public class Vecino {
     @Lob
     @Column(columnDefinition = "TEXT")
     private String notas;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "comunidad_id", nullable = false)
-    private Comunidad comunidad;
 
     @OneToMany(mappedBy = "vecino", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ConceptoCobro> listaConceptos = new ArrayList<>();
@@ -116,69 +135,228 @@ public class Vecino {
 
     // --- GETTERS Y SETTERS ---
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
 
-    public String getNombre() { return nombre; }
-    public void setNombre(String nombre) { this.nombre = nombre; }
+    public Long getId() {
+        return id;
+    }
 
-    public String getTelefono_1() { return telefono_1; }
-    public void setTelefono_1(String telefono_1) { this.telefono_1 = telefono_1; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getTelefono_2() { return telefono_2; }
-    public void setTelefono_2(String telefono_2) { this.telefono_2 = telefono_2; }
+    public Comunidad getComunidad() {
+        return comunidad;
+    }
 
-    public String getTelefono_3() { return telefono_3; }
-    public void setTelefono_3(String telefono_3) { this.telefono_3 = telefono_3; }
+    public void setComunidad(Comunidad comunidad) {
+        this.comunidad = comunidad;
+    }
 
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public String getNombre() {
+        return nombre;
+    }
 
-    public String getNif() { return nif; }
-    public void setNif(String nif) { this.nif = nif; }
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
 
-    public String getVivienda() { return vivienda; }
-    public void setVivienda(String vivienda) { this.vivienda = vivienda; }
+    public String getTelefono_1() {
+        return telefono_1;
+    }
 
-    public String getPisoPorton() { return pisoPorton; }
-    public void setPisoPorton(String pisoPorton) { this.pisoPorton = pisoPorton; }
+    public void setTelefono_1(String telefono_1) {
+        this.telefono_1 = telefono_1;
+    }
 
-    public BigDecimal getCoeficiente() { return coeficiente; }
-    public void setCoeficiente(BigDecimal coeficiente) { this.coeficiente = coeficiente; }
+    public String getTelefono_2() {
+        return telefono_2;
+    }
 
-    public String getDireccionNotificacion() { return direccionNotificacion; }
-    public void setDireccionNotificacion(String direccionNotificacion) { this.direccionNotificacion = direccionNotificacion; }
+    public void setTelefono_2(String telefono_2) {
+        this.telefono_2 = telefono_2;
+    }
 
-    public String getIban() { return iban; }
-    public void setIban(String iban) { this.iban = iban; }
+    public String getTelefono_3() {
+        return telefono_3;
+    }
 
-    public String getBic() { return bic; }
-    public void setBic(String bic) { this.bic = bic; }
+    public void setTelefono_3(String telefono_3) {
+        this.telefono_3 = telefono_3;
+    }
 
-    public String getReferenciaMandato() { return referenciaMandato; }
-    public void setReferenciaMandato(String referenciaMandato) { this.referenciaMandato = referenciaMandato; }
+    public String getNif() {
+        return nif;
+    }
 
-    public String getRutaMandatoFirmado() { return rutaMandatoFirmado; }
-    public void setRutaMandatoFirmado(String rutaMandatoFirmado) { this.rutaMandatoFirmado = rutaMandatoFirmado; }
+    public void setNif(String nif) {
+        this.nif = nif;
+    }
 
-    public String getCuentaContable() { return cuentaContable; }
-    public void setCuentaContable(String cuentaContable) { this.cuentaContable = cuentaContable; }
+    public String getIban() {
+        return iban;
+    }
 
-    public boolean isDomiciliado() { return domiciliado; }
-    public void setDomiciliado(boolean domiciliado) { this.domiciliado = domiciliado; }
+    public void setIban(String iban) {
+        this.iban = iban;
+    }
 
-    public boolean isEnvioDigital() { return envioDigital; }
-    public void setEnvioDigital(boolean envioDigital) { this.envioDigital = envioDigital; }
+    public String getBic() {
+        return bic;
+    }
 
-    public boolean isActivo() { return activo; }
-    public void setActivo(boolean activo) { this.activo = activo; }
+    public void setBic(String bic) {
+        this.bic = bic;
+    }
 
-    public String getNotas() { return notas; }
-    public void setNotas(String notas) { this.notas = notas; }
+    public String getDireccion() {
+        return direccion;
+    }
 
-    public Comunidad getComunidad() { return comunidad; }
-    public void setComunidad(Comunidad comunidad) { this.comunidad = comunidad; }
+    public void setDireccion(String direccion) {
+        this.direccion = direccion;
+    }
 
-    public List<ConceptoCobro> getListaConceptos() { return listaConceptos; }
-    public void setListaConceptos(List<ConceptoCobro> listaConceptos) { this.listaConceptos = listaConceptos; }
+    public String getPoblacion() {
+        return poblacion;
+    }
+
+    public void setPoblacion(String poblacion) {
+        this.poblacion = poblacion;
+    }
+
+    public String getCodigopostal(){
+        return codigopostal;
+    }
+
+    public void setCodigopostal(String codigopostal) {
+        this.codigopostal = codigopostal;
+    }
+
+    public String getProvincia() {
+        return provincia;
+    }
+
+    public void setProvincia(String provincia) {
+        this.provincia = provincia;
+    }
+
+    public String getPais_cod() {
+        return pais_cod;
+    }
+
+    public void setPais_cod(String pais_cod) {
+        this.pais_cod = pais_cod;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getReferenciaMandato() {
+        return referenciaMandato;
+    }
+
+    public void setReferenciaMandato(String referenciaMandato) {
+        this.referenciaMandato = referenciaMandato;
+    }
+
+    public String getPisoPorton() {
+        return pisoPorton;
+    }
+
+    public void setPisoPorton(String pisoPorton) {
+        this.pisoPorton = pisoPorton;
+    }
+
+    public String getDireccionNotificacion() {
+        return direccionNotificacion;
+    }
+
+    public void setDireccionNotificacion(String direccionNotificacion) {
+        this.direccionNotificacion = direccionNotificacion;
+    }
+
+    public String getRutaMandatoFirmado() {
+        return rutaMandatoFirmado;
+    }
+
+    public void setRutaMandatoFirmado(String rutaMandatoFirmado) {
+        this.rutaMandatoFirmado = rutaMandatoFirmado;
+    }
+
+    public Long getCuentaContableId() {
+        return cuentaContableId;
+    }
+
+    public void setCuentaContableId(Long cuentaContableId) {
+        this.cuentaContableId = cuentaContableId;
+    }
+
+    public String getCuentaContable() {
+        return cuentaContable;
+    }
+
+    public void setCuentaContable(String cuentaContable) {
+        this.cuentaContable = cuentaContable;
+    }
+
+    public String getVivienda() {
+        return vivienda;
+    }
+
+    public void setVivienda(String vivienda) {
+        this.vivienda = vivienda;
+    }
+
+    public BigDecimal getCoeficiente() {
+        return coeficiente;
+    }
+
+    public void setCoeficiente(BigDecimal coeficiente) {
+        this.coeficiente = coeficiente;
+    }
+
+    public boolean isDomiciliado() {
+        return domiciliado;
+    }
+
+    public void setDomiciliado(boolean domiciliado) {
+        this.domiciliado = domiciliado;
+    }
+
+    public boolean isEnvioDigital() {
+        return envioDigital;
+    }
+
+    public void setEnvioDigital(boolean envioDigital) {
+        this.envioDigital = envioDigital;
+    }
+
+    public boolean isActivo() {
+        return activo;
+    }
+
+    public void setActivo(boolean activo) {
+        this.activo = activo;
+    }
+
+    public String getNotas() {
+        return notas;
+    }
+
+    public void setNotas(String notas) {
+        this.notas = notas;
+    }
+
+    public List<ConceptoCobro> getListaConceptos() {
+        return listaConceptos;
+    }
+
+    public void setListaConceptos(List<ConceptoCobro> listaConceptos) {
+        this.listaConceptos = listaConceptos;
+    }
 }

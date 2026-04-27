@@ -14,7 +14,7 @@
                 <h1 class="h2 fw-bold text-dark"><i class="bi bi-speedometer2 text-primary me-2"></i>Panel de Control</h1>
                 <div class="badge bg-white text-dark border shadow-sm p-2 px-3">
                     <i class="bi bi-person-circle text-primary me-2"></i>
-                    Administrador: <span class="fw-bold" th:text="${#authentication.name}">Usuario</span>
+                    Administrador: <span class="fw-bold" th:text="${#authentication?.name}">Usuario</span>
                 </div>
             </div>
 

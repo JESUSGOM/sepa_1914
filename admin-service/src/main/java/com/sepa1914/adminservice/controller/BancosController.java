@@ -192,7 +192,7 @@ public class BancosController {
             String contenidoFichero = sepaService.generarCuaderno19(comunidad, vecinos, fechaCargo);
 
             byte[] data = contenidoFichero.getBytes(StandardCharsets.ISO_8859_1);
-            String nombreFichero = "1914_" + comunidad.getNombre().trim().replaceAll("\\s+", "_").toUpperCase() + "_" + mes + "_" + anio + ".c19";
+            String nombreFichero = "RMS-" + comunidad.getNombre().trim().replaceAll("\\s+", "_").toUpperCase() + "_" + mes + "_" + anio + ".c19";
 
             rutaRepo.findAll().stream().findFirst().ifPresent(conf -> {
                 if (conf.getRutaC19() != null && !conf.getRutaC19().isBlank()) {
