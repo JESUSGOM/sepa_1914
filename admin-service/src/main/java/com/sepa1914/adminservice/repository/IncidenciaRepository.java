@@ -24,4 +24,10 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
      * Cuenta cuántas incidencias hay abiertas o en proceso.
      */
     long countByComunidadIdAndEstadoIn(Long comunidadId, List<Incidencia.EstadoIncidencia> estados);
+
+    /**
+     * NUEVO: Cuenta el total de incidencias en un estado concreto para el Dashboard Global.
+     * Este método es el que soluciona el error en HomeController.java
+     */
+    long countByEstado(Incidencia.EstadoIncidencia estado);
 }

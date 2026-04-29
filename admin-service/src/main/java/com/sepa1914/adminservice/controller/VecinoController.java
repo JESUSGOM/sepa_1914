@@ -79,11 +79,12 @@ public class VecinoController {
     }
 
     /**
-     * Lista vecinos con paginación y ordenación.
+     * Lista vecinos con BÚSQUEDA, PAGINACIÓN y ORDENACIÓN.
      */
     @GetMapping("/lista")
     public String listarVecinos(
             @RequestParam(required = false) Long comunidadId,
+            @RequestParam(required = false) String buscar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(defaultValue = "nombre") String sortField,
@@ -101,26 +102,32 @@ public class VecinoController {
             return "redirect:/comunidades/lista?error=no_autorizado";
         }
 
-        // 1. Lógica dinámica: Si el usuario pide 'asc', ordenamos ascendente; si no, descendente.
+        // 1. Configuración de ordenación dinámica
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name())
                 ? Sort.by(sortField).ascending()
                 : Sort.by(sortField).descending();
 
-        // 2. Creamos la petición de página usando el objeto 'sort' que acabamos de configurar
         Pageable pageable = PageRequest.of(page, size, sort);
+        Page<Vecino> vecinosPage;
 
-        // 3. Buscamos en la base de datos (Spring Data JPA ya sabe qué hacer con ese 'sort')
-        Page<Vecino> vecinosPage = vecinoRepository.findByComunidad(comunidad, pageable);
+        // 2. Lógica de filtrado por búsqueda o listado total
+        if (buscar != null && !buscar.trim().isEmpty()) {
+            vecinosPage = vecinoRepository.buscarVecinos(comunidadId, buscar, pageable);
+        } else {
+            vecinosPage = vecinoRepository.findByComunidad(comunidad, pageable);
+        }
 
         model.addAttribute("activePage", "vecinos");
         model.addAttribute("comunidad", comunidad);
-        model.addAttribute("vecinos", vecinosPage);
+        model.addAttribute("vecinos", vecinosPage.getContent());
+        model.addAttribute("pagina", vecinosPage);
         model.addAttribute("currentPage", page);
         model.addAttribute("totalPages", vecinosPage.getTotalPages());
         model.addAttribute("totalItems", vecinosPage.getTotalElements());
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortDir", sortDir);
         model.addAttribute("reverseSortDir", sortDir.equals("asc") ? "desc" : "asc");
+        model.addAttribute("searchTerm", buscar);
 
         return "vecinos-lista";
     }
@@ -314,7 +321,6 @@ public class VecinoController {
 //
 //            for (Vecino v : lista) {
 //                // Solo encriptamos si no parece ya encriptado (evita doble encriptación)
-//                // Un dato encriptado por tu EncryptionUtil suele terminar en '=' o ser muy largo
 //                if (v.getNif() != null && !v.getNif().contains("==") && v.getNif().length() < 20) {
 //                    if (v.getNif() != null) v.setNif(EncryptionUtil.encrypt(v.getNif()));
 //                    if (v.getEmail() != null) v.setEmail(EncryptionUtil.encrypt(v.getEmail()));
@@ -339,7 +345,6 @@ public class VecinoController {
 //            int contador = 0;
 //
 //            for (Comunidad c : comunidades) {
-//                // Solo encriptamos si el IBAN no parece ya encriptado (longitud corta)
 //                if (c.getIban() != null && c.getIban().length() < 30) {
 //
 //                    if (c.getIdentificadorAcreedor() != null)

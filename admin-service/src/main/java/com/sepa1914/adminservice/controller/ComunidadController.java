@@ -40,6 +40,7 @@ public class ComunidadController {
     private final ContabilidadService contabilidadService;
     private final FicheroGeneradoRepository ficheroRepository;
     private final LicenseService licenseService;
+    private final QrPdfService qrPdfService;
 
     public ComunidadController(ComunidadRepository comunidadRepository, UsuarioRepository usuarioRepository,
                                VecinoRepository vecinoRepository, SepaService sepaService,
@@ -47,7 +48,7 @@ public class ComunidadController {
                                ConfiguracionRutasRepository configuracionRutasRepository,
                                ContabilidadService contabilidadService,
                                FicheroGeneradoRepository ficheroRepository,
-                               LicenseService licenseService) {
+                               LicenseService licenseService, QrPdfService qrPdfService) {
         this.comunidadRepository = comunidadRepository;
         this.usuarioRepository = usuarioRepository;
         this.vecinoRepository = vecinoRepository;
@@ -58,6 +59,7 @@ public class ComunidadController {
         this.contabilidadService = contabilidadService;
         this.ficheroRepository = ficheroRepository;
         this.licenseService = licenseService;
+        this.qrPdfService = qrPdfService;
     }
 
     @GetMapping("/lista")
@@ -289,6 +291,29 @@ public class ComunidadController {
     private Usuario getUsuarioLogueado(Authentication auth) {
         return usuarioRepository.findByUsername(auth.getName()).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
+
+    @GetMapping("/{id}/descargar-qr")
+    public ResponseEntity<byte[]> descargarQrPdf(@PathVariable Long id) {
+        try {
+            Comunidad comunidad = comunidadRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
+
+            byte[] pdfBytes = qrPdfService.generarPdfSoloQr(comunidad);
+
+            String filename = "QR_INCIDENCIAS_" + comunidad.getNombre().replace(" ", "_") + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+
+        } catch (Exception e) {
+            log.error("Error generando PDF del QR: {}", e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+
 
 //    @GetMapping("/migrar-comunidades-seguras")
 //    @ResponseBody

@@ -275,6 +275,12 @@
                         <i class="bi bi-shield-check"></i> Certificado de Deudas
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/incidencias/lista}"
+                       th:classappend="${activePage == 'incidencias' ? 'active' : ''}">
+                        <i class="bi bi-bell-fill text-danger"></i> Avisos Incidencias
+                    </a>
+                </li>
             </ul>
 
             <div class="sidebar-heading mt-3">Configuración</div>

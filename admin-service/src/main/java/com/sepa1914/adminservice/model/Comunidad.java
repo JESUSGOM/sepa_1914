@@ -50,6 +50,9 @@ public class Comunidad {
     @Column(name = "bic", length = 11)
     private String bic;
 
+    @Column(name = "token_qr", unique = true, length = 100)
+    private String tokenQr;
+
     // 🔹 FK usuario_id (NOT NULL)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
@@ -144,6 +147,9 @@ public class Comunidad {
     public void setVecinos(List<Vecino> vecinos) {
         this.vecinos = vecinos;
     }
+
+    public String getTokenQr() { return tokenQr; }
+    public void setTokenQr(String tokenQr) { this.tokenQr = tokenQr; }
 
     // --- equals / hashCode ---
 

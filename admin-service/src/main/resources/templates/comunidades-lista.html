@@ -26,19 +26,6 @@
                 <i class="bi bi-check-circle-fill me-2"></i> Comunidad guardada correctamente.
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
             </div>
-            <div th:if="${param.editado}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
-                <i class="bi bi-pencil-square me-2"></i> Datos actualizados correctamente.
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
-            </div>
-            <div th:if="${seleccionExito}" class="alert alert-info alert-dismissible fade show shadow-sm" role="alert">
-                <i class="bi bi-info-circle-fill me-2"></i> <span th:text="${seleccionExito}"></span>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
-            </div>
-            <div th:if="${param.error}" class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                <strong>Atención:</strong> <span th:text="${param.error}">Error en la operación</span>.
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
-            </div>
 
             <div class="card shadow-sm mt-3 border-0">
                 <div class="card-body p-0">
@@ -62,174 +49,45 @@
                                         </div>
                                     </a>
                                 </td>
+
                                 <td>
                                     <div class="small mb-1"><span class="text-muted">Acreedor:</span> <code class="text-primary fw-bold" th:text="${comunidad.identificadorAcreedor}">ESXX</code></div>
                                     <div class="small font-monospace text-secondary" style="font-size: 0.8rem;" th:text="${comunidad.iban}">IBAN</div>
                                 </td>
+
                                 <td>
                                     <span class="badge bg-light text-dark border" th:text="${comunidad.poblacion}">Población</span>
                                 </td>
+
                                 <td class="text-center">
                                     <a th:href="@{/comunidades/seleccionar/{id}(id=${comunidad.id})}" class="btn btn-sm btn-primary shadow-sm me-2">
                                         <i class="bi bi-power"></i> Activar
                                     </a>
 
                                     <div class="btn-group btn-group-sm me-2 shadow-sm" role="group">
-                                        <a th:href="@{/contabilidad/recibos/{id}(id=${comunidad.id})}"
-                                           class="btn btn-success" title="Conciliar Ingresos (Recibos Bancarios)">
-                                            <i class="bi bi-bank"></i>
-                                        </a>
-                                        <a th:href="@{/contabilidad/gastos/{id}(id=${comunidad.id})}"
-                                           class="btn btn-warning" title="Gestionar Gastos y Facturas">
-                                            <i class="bi bi-receipt"></i>
-                                        </a>
-                                        <a th:href="@{/contabilidad/liquidacion/{id}(id=${comunidad.id})}"
-                                           class="btn btn-primary" title="Estado de Liquidación y Desviaciones">
-                                            <i class="bi bi-graph-up-arrow"></i>
-                                        </a>
+                                        <a th:href="@{/contabilidad/recibos/{id}(id=${comunidad.id})}" class="btn btn-success" title="Ingresos"><i class="bi bi-bank"></i></a>
+                                        <a th:href="@{/contabilidad/gastos/{id}(id=${comunidad.id})}" class="btn btn-warning" title="Gastos"><i class="bi bi-receipt"></i></a>
                                     </div>
 
                                     <div class="btn-group btn-group-sm me-2 shadow-sm" role="group">
-                                        <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}"
-                                           class="btn btn-info text-white" title="Listado de Vecinos">
-                                            <i class="bi bi-people"></i>
-                                        </a>
-                                        <button type="button" class="btn btn-dark"
-                                                data-bs-toggle="modal" th:data-bs-target="'#modalFecha' + ${comunidad.id}"
-                                                title="Generar Cuaderno Bancario .C19">
+                                        <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}" class="btn btn-info text-white" title="Vecinos"><i class="bi bi-people"></i></a>
+                                        <button type="button" class="btn btn-dark" data-bs-toggle="modal" th:data-bs-target="'#modalFecha' + ${comunidad.id}" title="Cuaderno .C19">
                                             <i class="bi bi-file-earmark-binary"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-primary"
-                                                data-bs-toggle="modal" th:data-bs-target="'#modalConvocatoria' + ${comunidad.id}"
-                                                title="Preparar Convocatoria de Junta">
-                                            <i class="bi bi-megaphone"></i>
                                         </button>
                                     </div>
 
                                     <div class="btn-group btn-group-sm shadow-sm" role="group">
-                                        <a th:href="@{/comunidades/descargar-pdf-resumen/{id}(id=${comunidad.id})}"
-                                           class="btn btn-outline-danger" title="PDF Resumen de Conceptos">
+                                        <a th:href="@{/comunidades/{id}/descargar-qr(id=${comunidad.id})}"
+                                           class="btn btn-success" title="Descargar QR para el Tablón">
+                                            <i class="bi bi-qr-code"></i>
+                                        </a>
+                                        <a th:href="@{/comunidades/descargar-pdf-resumen/{id}(id=${comunidad.id})}" class="btn btn-outline-danger" title="PDF Resumen">
                                             <i class="bi bi-file-earmark-pdf"></i>
                                         </a>
-                                        <a th:href="@{/comunidades/editar/{id}(id=${comunidad.id})}"
-                                           class="btn btn-outline-secondary" title="Configuración de la Finca">
+                                        <a th:href="@{/comunidades/editar/{id}(id=${comunidad.id})}" class="btn btn-outline-secondary" title="Configurar">
                                             <i class="bi bi-gear"></i>
                                         </a>
                                     </div>
-
-                                    <div class="modal fade" th:id="'modalFecha' + ${comunidad.id}" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content border-0 shadow">
-                                                <form th:action="@{/bancos/descargar-remesa/{id}(id=${comunidad.id})}" method="post">
-                                                    <div class="modal-header bg-dark text-white">
-                                                        <h5 class="modal-title"><i class="bi bi-calendar-check me-2"></i>Generar Remesa y Recibos</h5>
-                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <div class="modal-body text-start p-4">
-                                                        <div class="alert alert-warning small py-2 mb-3">
-                                                            <i class="bi bi-exclamation-triangle"></i> <strong>Atención:</strong> Si ya existen recibos para este periodo, se borrarán y se generarán de nuevo.
-                                                        </div>
-
-                                                        <p class="mb-3">Comunidad: <strong class="text-primary" th:text="${comunidad.nombre}">Nombre</strong></p>
-
-                                                        <div class="row g-3">
-                                                            <div class="col-md-7">
-                                                                <label class="form-label fw-bold">Mes del recibo:</label>
-                                                                <select name="mes" class="form-select" required>
-                                                                    <option value="1">Enero</option>
-                                                                    <option value="2">Febrero</option>
-                                                                    <option value="3">Marzo</option>
-                                                                    <option value="4">Abril</option>
-                                                                    <option value="5" selected>Mayo</option>
-                                                                    <option value="6">Junio</option>
-                                                                    <option value="7">Julio</option>
-                                                                    <option value="8">Agosto</option>
-                                                                    <option value="9">Septiembre</option>
-                                                                    <option value="10">Octubre</option>
-                                                                    <option value="11">Noviembre</option>
-                                                                    <option value="12">Diciembre</option>
-                                                                </select>
-                                                            </div>
-
-                                                            <div class="col-md-5">
-                                                                <label class="form-label fw-bold">Año:</label>
-                                                                <input type="number" name="anio" class="form-control"
-                                                                       th:value="${#temporals.format(#temporals.createNow(), 'yyyy')}" required>
-                                                            </div>
-
-                                                            <div class="col-12 mt-3">
-                                                                <label class="form-label fw-bold text-secondary">Fecha de ejecución bancaria:</label>
-                                                                <input type="date" name="fechaCargo" class="form-control"
-                                                                       th:value="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}" required>
-                                                                <div class="form-text">Día en que el banco realizará el cobro.</div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer bg-light">
-                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                        <button type="submit" class="btn btn-primary px-4" th:onclick="'cerrarModal(' + ${comunidad.id} + ')'">
-                                                            <i class="bi bi-gear-fill me-2"></i>Procesar Todo
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="modal fade" th:id="'modalConvocatoria' + ${comunidad.id}" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content border-0 shadow">
-                                                <form th:action="@{/informes/convocatoria/{id}(id=${comunidad.id})}" method="get" target="_blank">
-                                                    <div class="modal-header bg-primary text-white">
-                                                        <h5 class="modal-title"><i class="bi bi-megaphone me-2"></i>Preparar Convocatoria</h5>
-                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <div class="modal-body text-start p-4">
-                                                        <p class="small text-muted mb-3">Configure los datos de la reunión para generar las cartas personalizadas.</p>
-
-                                                        <div class="mb-3">
-                                                            <label class="form-label fw-bold">Fecha de la Junta:</label>
-                                                            <input type="text" name="fechaJunta" class="form-control" placeholder="Ej: 15 de Abril de 2026" required>
-                                                        </div>
-
-                                                        <div class="mb-3">
-                                                            <label class="form-label fw-bold">Lugar de la Reunión:</label>
-                                                            <input type="text" name="lugar" class="form-control" placeholder="Ej: Portales de la comunidad" required>
-                                                        </div>
-
-                                                        <div class="row mb-3">
-                                                            <div class="col">
-                                                                <label class="form-label fw-bold small">1ª Convocatoria</label>
-                                                                <input type="time" name="hora1" class="form-control" value="19:00">
-                                                            </div>
-                                                            <div class="col">
-                                                                <label class="form-label fw-bold small">2ª Convocatoria</label>
-                                                                <input type="time" name="hora2" class="form-control" value="19:30">
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="mb-0">
-                                                            <label class="form-label fw-bold">Orden del Día (un punto por línea):</label>
-                                                            <textarea name="puntosArea" class="form-control" rows="4"
-                                                                      placeholder="1. Lectura del acta anterior&#10;2. Aprobación de cuentas..."></textarea>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer bg-light">
-                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                                                        <button type="submit" class="btn btn-primary px-4">
-                                                            <i class="bi bi-file-pdf me-2"></i>Generar PDF Masivo
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr th:if="${#lists.isEmpty(comunidades)}">
-                                <td colspan="4" class="text-center py-5 text-muted">
-                                    <i class="bi bi-building-exclamation display-4 d-block mb-3 opacity-25"></i>
-                                    No hay comunidades registradas todavía.
                                 </td>
                             </tr>
                             </tbody>
@@ -242,41 +100,19 @@
                 <div class="row align-items-center text-center text-md-start">
                     <div class="col-md-7 border-md-end">
                         <span class="text-secondary text-uppercase fw-bold" style="font-size: 0.65rem;">Módulo de Contabilidad Profesional</span><br>
+                        <span class="me-3"><i class="bi bi-qr-code text-success"></i> QR Incidencias</span>
                         <span class="me-3"><i class="bi bi-bank text-success"></i> Ingresos</span>
                         <span class="me-3"><i class="bi bi-receipt text-warning"></i> Facturas</span>
-                        <span class="me-3"><i class="bi bi-graph-up-arrow text-primary"></i> Liquidación Anual</span>
-                        <span class="me-3"><i class="bi bi-people text-info"></i> Propietarios</span>
                     </div>
                     <div class="col-md-5 ps-md-4 mt-2 mt-md-0">
                         <span class="text-secondary text-uppercase fw-bold" style="font-size: 0.65rem;">Herramientas SEPA</span><br>
                         <span class="me-3"><i class="bi bi-file-earmark-binary text-dark"></i> Cuaderno .C19</span>
                         <span class="me-3"><i class="bi bi-file-earmark-pdf text-danger"></i> Reporte PDF</span>
-                        <span class="me-3"><i class="bi bi-megaphone text-primary"></i> Convocatoria</span>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<script th:inline="javascript">
-    /**
-     * Cierra el modal automáticamente tras iniciar la descarga.
-     */
-    function cerrarModal(id) {
-        const modalElement = document.getElementById('modalFecha' + id);
-        if (modalElement) {
-            setTimeout(() => {
-                const modalInstance = bootstrap.Modal.getInstance(modalElement);
-                if (modalInstance) modalInstance.hide();
-                const backdrop = document.querySelector('.modal-backdrop');
-                if (backdrop) backdrop.remove();
-                document.body.style.overflow = 'auto';
-            }, 1200);
-        }
-    }
-</script>
 </body>
 </html>

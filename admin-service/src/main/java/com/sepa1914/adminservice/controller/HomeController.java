@@ -1,5 +1,6 @@
 package com.sepa1914.adminservice.controller;
 
+import com.sepa1914.adminservice.model.Incidencia; // <--- AÑADIDO
 import com.sepa1914.adminservice.model.Usuario;
 import com.sepa1914.adminservice.repository.*;
 import org.springframework.stereotype.Controller;
@@ -16,17 +17,20 @@ public class HomeController {
     private final ConceptoCobroRepository conceptoRepository;
     private final UsuarioRepository usuarioRepository;
     private final FicheroGeneradoRepository ficheroRepository;
+    private final IncidenciaRepository incidenciaRepository; // <--- AÑADIDO
 
     public HomeController(ComunidadRepository comunidadRepository,
                           VecinoRepository vecinoRepository,
                           ConceptoCobroRepository conceptoRepository,
                           UsuarioRepository usuarioRepository,
-                          FicheroGeneradoRepository ficheroRepository) {
+                          FicheroGeneradoRepository ficheroRepository,
+                          IncidenciaRepository incidenciaRepository) { // <--- AÑADIDO
         this.comunidadRepository = comunidadRepository;
         this.vecinoRepository = vecinoRepository;
         this.conceptoRepository = conceptoRepository;
         this.usuarioRepository = usuarioRepository;
         this.ficheroRepository = ficheroRepository;
+        this.incidenciaRepository = incidenciaRepository; // <--- AÑADIDO
     }
 
     @GetMapping("/")
@@ -46,6 +50,11 @@ public class HomeController {
         model.addAttribute("totalVecinos", vecinoRepository.contarPorUsuario(usuario.getId()));
         model.addAttribute("totalConceptos", conceptoRepository.contarPorUsuario(usuario.getId()));
         model.addAttribute("totalRemesas", ficheroRepository.contarPorUsuario(usuario.getId()));
+
+        // --- NUEVA LÓGICA PARA EL CUADRO DE INCIDENCIAS ---
+        // Contamos las incidencias que están en estado PENDIENTE
+        long totalPendientes = incidenciaRepository.countByEstado(Incidencia.EstadoIncidencia.PENDIENTE);
+        model.addAttribute("totalIncidenciasEnCurso", totalPendientes);
 
         return "dashboard";
     }
