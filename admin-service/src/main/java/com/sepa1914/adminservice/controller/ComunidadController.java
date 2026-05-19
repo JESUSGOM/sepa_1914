@@ -205,7 +205,10 @@ public class ComunidadController {
             comunidadAPersistir.setPoblacion(comunidadForm.getPoblacion());
             comunidadAPersistir.setCodigoPostal(comunidadForm.getCodigoPostal());
             comunidadAPersistir.setIdentificadorAcreedor(comunidadForm.getIdentificadorAcreedor());
-            comunidadAPersistir.setIban(comunidadForm.getIban());
+            if (comunidadForm.getIban() != null) {
+                // Esto elimina CUALQUIER espacio en blanco físico antes de procesarlo
+                comunidadAPersistir.setIban(comunidadForm.getIban().replaceAll("\\s+", ""));
+            }
             comunidadAPersistir.setBic(comunidadForm.getBic());
             comunidadAPersistir.setTipoReparto(comunidadForm.getTipoReparto());
         } else {
