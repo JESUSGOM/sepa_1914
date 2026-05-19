@@ -22,12 +22,15 @@
                     <i class="bi bi-receipt text-warning"></i> Gastos - <small class="text-muted" th:text="${comunidad.nombre}"></small>
                 </h1>
                 <div class="btn-group shadow-sm">
-                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoGasto">
-                        <i class="bi bi-plus-circle me-1"></i> Rápido
-                    </button>
-                    <a th:href="@{/contabilidad/gastos/nuevo/{id}(id=${comunidad.id})}" class="btn btn-sm btn-dark">
-                        <i class="bi bi-file-earmark-plus"></i> Detallado
+                    <a th:href="@{/contabilidad/apertura/{id}(id=${comunidad.id})}" class="btn btn-sm btn-outline-dark">
+                        <i class="bi bi-door-open"></i> Apertura
                     </a>
+                    <a th:href="@{/contabilidad/gastos/regenerar/{id}(id=${comunidad.id})}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-repeat"></i> Regenerar Asientos
+                    </a>
+                    <button class="btn btn-sm btn-warning fw-bold" data-bs-toggle="modal" data-bs-target="#modalNuevoGasto">
+                        <i class="bi bi-plus-circle"></i> NUEVO GASTO / FACTURA
+                    </button>
                 </div>
             </div>
 
@@ -40,12 +43,13 @@
                         <table class="table table-sm table-hover align-middle mb-0">
                             <thead class="table-light small text-secondary text-uppercase">
                             <tr>
-                                <th class="ps-3" style="width: 15%">Fecha / Nº</th>
-                                <th style="width: 30%">Proveedor / Concepto</th>
-                                <th style="width: 15%">Cuenta</th>
+                                <th class="ps-3" style="width: 12%">Fecha / Nº</th>
+                                <th style="width: 25%">Proveedor / Concepto</th>
+                                <th style="width: 12%">Cuenta</th>
                                 <th class="text-end" style="width: 10%">Importe</th>
-                                <th class="text-center" style="width: 10%">Estado</th>
-                                <th class="text-center" style="width: 5%">Doc</th> <th class="text-end pe-3" style="width: 15%">Acciones</th>
+                                <th class="text-center" style="width: 12%">Asiento</th> <th class="text-center" style="width: 10%">Estado</th>
+                                <th class="text-center" style="width: 5%">Doc</th>
+                                <th class="text-end pe-3" style="width: 14%">Acciones</th>
                             </tr>
                             </thead>
                             <tbody class="small">
@@ -65,7 +69,14 @@
                                     <span class="text-muted italic" th:unless="${g.cuentaGasto != null}">S/A</span>
                                 </td>
                                 <td class="text-end fw-bold">
-                                    <span th:text="${#numbers.formatDecimal(g.importeTotal, 1, 2, 'COMMA')}"></span> €
+                                    <span th:text="${#numbers.formatDecimal(g.importeTotal, 1, 'POINT', 2, 'COMMA')}"></span> €
+                                </td>
+                                <td class="text-center">
+                                    <span th:if="${g.numeroAsiento != null}"
+                                          class="badge bg-success-subtle text-success border border-success-subtle font-monospace x-small"
+                                          th:text="${g.numeroAsiento}">GAS-123</span>
+                                    <span th:if="${g.numeroAsiento == null}"
+                                          class="badge bg-light text-muted border">PENDIENTE</span>
                                 </td>
                                 <td class="text-center">
                                     <span th:if="${g.pagado}" class="badge bg-success-subtle text-success px-2 py-1">
@@ -96,13 +107,20 @@
                                                 th:onclick="abrirModalPago([[${g.id}]], [[${g.proveedor}]], [[${g.importeTotal}]])">
                                             PAGAR
                                         </button>
+                                        <a th:if="${g.pagado}"
+                                           th:href="@{/contabilidad/gastos/deshacer-pago/{id}(id=${g.id})}"
+                                           class="btn btn-xs btn-outline-danger py-0 ms-1"
+                                           title="Anular pago y volver a conciliar"
+                                           onclick="return confirm('¿Seguro que quieres anular el pago de esta factura? Se borrará el apunte del banco.')">
+                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                        </a>
                                     </div>
                                     <div th:if="${g.pagado}" class="text-muted italic x-small mt-1"
                                          th:text="${#temporals.format(g.fechaPago, 'dd/MM/yyyy')}"></div>
                                 </td>
                             </tr>
                             <tr th:if="${#lists.isEmpty(gastos)}">
-                                <td colspan="7" class="text-center py-5 text-muted">
+                                <td colspan="8" class="text-center py-5 text-muted">
                                     <i class="bi bi-inbox fs-2 d-block mb-2"></i> No hay gastos registrados en esta comunidad.
                                 </td>
                             </tr>

@@ -59,6 +59,12 @@ public class Recibo {
     @Column(name = "fecha_cobro_banco")
     private LocalDate fechaCobroBanco;
 
+    @Column(name = "tipo_remesa")
+    private String tipoRemesa = "ORDINARIA"; // ORDINARIA o EXTRAORDINARIA
+
+    @Column(name = "etiqueta_extra")
+    private String etiquetaExtra;
+
     /**
      * Relación con el apunte real de la Norma 43.
      */
@@ -122,36 +128,28 @@ public class Recibo {
     }
 
     // --- GETTERS Y SETTERS ---
-
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-
     public LocalDate getFechaEmision() { return fechaEmision; }
     public void setFechaEmision(LocalDate fechaEmision) { this.fechaEmision = fechaEmision; }
-
     public String getConcepto() { return concepto; }
     public void setConcepto(String concepto) { this.concepto = concepto; }
-
     public BigDecimal getImporte() { return importe; }
     public void setImporte(BigDecimal importe) { this.importe = importe; }
-
     public BigDecimal getPagadoAcumulado() { return pagadoAcumulado; }
     public void setPagadoAcumulado(BigDecimal pagadoAcumulado) { this.pagadoAcumulado = pagadoAcumulado; }
-
     public Vecino getVecino() { return vecino; }
     public void setVecino(Vecino vecino) { this.vecino = vecino; }
-
     public Comunidad getComunidad() { return comunidad; }
     public void setComunidad(Comunidad comunidad) { this.comunidad = comunidad; }
-
     public EstadoRecibo getEstado() { return estado; }
     public void setEstado(EstadoRecibo estado) { this.estado = estado; }
-
     public LocalDate getFechaCobroBanco() { return fechaCobroBanco; }
     public void setFechaCobroBanco(LocalDate fechaCobroBanco) { this.fechaCobroBanco = fechaCobroBanco; }
-
     public MovimientoBancario getMovimientoBancario() { return movimientoBancario; }
-    public void setMovimientoBancario(MovimientoBancario movimientoBancario) {
-        this.movimientoBancario = movimientoBancario;
-    }
+    public void setMovimientoBancario(MovimientoBancario movimientoBancario) {this.movimientoBancario = movimientoBancario;}
+    public String getTipoRemesa() { return tipoRemesa; }
+    public void setTipoRemesa(String tipoRemesa) { this.tipoRemesa = tipoRemesa; }
+    public String getEtiquetaExtra() { return etiquetaExtra; }
+    public void setEtiquetaExtra(String etiquetaExtra) { this.etiquetaExtra = etiquetaExtra; }
 }

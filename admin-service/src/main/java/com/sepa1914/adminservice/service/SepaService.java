@@ -50,175 +50,233 @@ public class SepaService {
         this.validator = validator;
     }
 
-    public String generarCuaderno19(Comunidad comunidad, List<Vecino> vecinos, LocalDate fechaCobro) {
+    public String generarCuaderno19(
+            Comunidad comunidad,
+            List<Vecino> vecinos,
+            LocalDate fechaCobro,
+            String tipoRemesa,      // "ORDINARIA" o "EXTRAORDINARIA"
+            String etiquetaExtra,    // Ejemplo: "Derrama Fachada"
+            boolean sustituir       // true para borrar lo anterior, false para añadir
+    ) {
 
-        log.info("🚀 INICIANDO REMESA GTI TURBO ESTABLE 3.0: '{}'", comunidad.getNombre());
+        log.info("🚀 INICIANDO REMESA GTI TURBO ESTABLE 4.0 [{}]: '{}'",
+                tipoRemesa, comunidad.getNombre());
 
-        // Limpieza previa del periodo contable para evitar duplicidades
+        // =========================================================
+        // LIMPIEZA CONTABLE PREVIA SELECTIVA
+        // =========================================================
+        // Se delega en contabilidadService la limpieza inteligente basada en tipo y etiqueta
         contabilidadService.limpiarContabilidadMesAntesDeRemesa(
                 comunidad.getId(),
                 fechaCobro.getMonthValue(),
-                fechaCobro.getYear()
+                fechaCobro.getYear(),
+                tipoRemesa,
+                etiquetaExtra,
+                sustituir
         );
 
-        final Administrador admin = inicializarAdmin(comunidad.getDatosAdministrador());
+        final Administrador admin =
+                inicializarAdmin(comunidad.getDatosAdministrador());
 
-        String idAcreedor = safe(comunidad.getIdentificadorAcreedor());
-        String ibanComunidad = safe(comunidad.getIban()).replace(" ", "");
-        String entidadOficina = ibanComunidad.length() >= 12 ? ibanComunidad.substring(4, 12) : "00000000";
+        String idAcreedor =
+                safe(comunidad.getIdentificadorAcreedor());
 
-        String hoy = LocalDate.now().format(ISO_DATE);
-        String fCobro = (fechaCobro != null) ? fechaCobro.format(ISO_DATE) : hoy;
-        String ahora = LocalTime.now().format(TIME_STAMP);
+        String ibanComunidad =
+                safe(comunidad.getIban()).replace(" ", "");
 
-        int mesRemesa = (fechaCobro != null) ? fechaCobro.getMonthValue() : LocalDate.now().getMonthValue();
-        int anioRemesa = (fechaCobro != null) ? fechaCobro.getYear() : LocalDate.now().getYear();
+        String entidadOficina =
+                ibanComunidad.length() >= 12
+                        ? ibanComunidad.substring(4, 12)
+                        : "00000000";
 
-        AtomicReference<BigDecimal> totalRemesaBancaria = new AtomicReference<>(BigDecimal.ZERO);
-        AtomicInteger numAdeudos003 = new AtomicInteger(0); // Contador de deudores únicos (registros 003)
+        String hoy =
+                LocalDate.now().format(ISO_DATE);
 
-        List<String> registrosDeudores = new CopyOnWriteArrayList<>();
-        List<RemesaTaskDTO> tareasBancarias = new ArrayList<>();
+        String fCobro =
+                (fechaCobro != null)
+                        ? fechaCobro.format(ISO_DATE)
+                        : hoy;
 
-        // ---------------- FASE 1: Registro Contable (Asiento Único por Vecino) ----------------
+        String ahora =
+                LocalTime.now().format(TIME_STAMP);
+
+        int mesRemesa =
+                (fechaCobro != null)
+                        ? fechaCobro.getMonthValue()
+                        : LocalDate.now().getMonthValue();
+
+        int anioRemesa =
+                (fechaCobro != null)
+                        ? fechaCobro.getYear()
+                        : LocalDate.now().getYear();
+
+        AtomicReference<BigDecimal> totalRemesaBancaria =
+                new AtomicReference<>(BigDecimal.ZERO);
+
+        AtomicInteger numAdeudos003 =
+                new AtomicInteger(0);
+
+        List<String> registrosDeudores =
+                new CopyOnWriteArrayList<>();
+
+        // =========================================================
+        // FASE 1: GENERAR REGISTROS
+        // =========================================================
         for (Vecino v : vecinos) {
-            if (v == null || !v.isActivo()) continue;
 
-            List<ConceptoCobro> conceptosAptos = v.getListaConceptos().stream()
-                    .filter(cc -> cc.correspondeMes(mesRemesa))
-                    .collect(Collectors.toList());
+            if (v == null || !v.isActivo()) {
+                continue;
+            }
 
-            if (conceptosAptos.isEmpty()) continue;
+            // Si es ORDINARIA, filtramos conceptos del mes.
+            // Si es EXTRAORDINARIA, solemos procesar conceptos específicos (esto depende de tu lógica de negocio)
+            List<ConceptoCobro> conceptosAptos =
+                    v.getListaConceptos()
+                            .stream()
+                            .filter(cc -> cc.correspondeMes(mesRemesa))
+                            .collect(Collectors.toList());
 
-            BigDecimal totalRecibo = conceptosAptos.stream()
-                    .map(ConceptoCobro::getImporte)
+            if (conceptosAptos.isEmpty()) {
+                continue;
+            }
+
+            List<LineaRemesaDTO> lineasRemesa = new ArrayList<>();
+
+            for (ConceptoCobro cc : conceptosAptos) {
+                BigDecimal base = cc.getImporte() != null ? cc.getImporte() : BigDecimal.ZERO;
+                if (base.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+                // LINEA BASE
+                lineasRemesa.add(new LineaRemesaDTO(cc.getDescripcion(), base));
+
+                // LINEA IMPUESTO
+                if (cc.getTipoImpuesto() != null && cc.getTipoImpuesto() != TipoImpuesto.EXENTO
+                        && cc.getPorcentajeImpuesto() != null && cc.getPorcentajeImpuesto().compareTo(BigDecimal.ZERO) > 0) {
+
+                    BigDecimal impuesto = base.multiply(cc.getPorcentajeImpuesto())
+                            .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+
+                    String textoImpuesto = cc.getTipoImpuesto().name() + " " + cc.getPorcentajeImpuesto() + "% " + cc.getDescripcion();
+                    lineasRemesa.add(new LineaRemesaDTO(textoImpuesto, impuesto));
+                }
+            }
+
+            if (lineasRemesa.isEmpty()) continue;
+
+            BigDecimal totalRecibo = lineasRemesa.stream()
+                    .map(LineaRemesaDTO::getImporte)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            if (totalRecibo.compareTo(BigDecimal.ZERO) > 0) {
-                String conceptoContable = generarTextoConcepto(v, conceptosAptos);
+            if (totalRecibo.compareTo(BigDecimal.ZERO) <= 0) continue;
 
-                Recibo reciboUnico = contabilidadService.registrarDevengoCuota(
-                        v, totalRecibo, conceptoContable,
-                        (fechaCobro != null) ? fechaCobro.withDayOfMonth(1) : LocalDate.now().withDayOfMonth(1)
-                );
+            String conceptContable = lineasRemesa.stream()
+                    .map(LineaRemesaDTO::getDescripcion)
+                    .collect(Collectors.joining(" / "));
 
-                // Desglose técnico para el banco (máximo 5 slots del 003 al 007)
-                int maxSlots = 5;
-                for (int i = 0; i < conceptosAptos.size(); i++) {
-                    if (i < maxSlots - 1) {
-                        ConceptoCobro cc = conceptosAptos.get(i);
-                        tareasBancarias.add(new RemesaTaskDTO(v, reciboUnico, Collections.singletonList(cc),
-                                cc.getImporte(), "00" + (3 + i), cc.getDescripcion()));
-                    } else {
-                        List<ConceptoCobro> restantes = conceptosAptos.subList(i, conceptosAptos.size());
-                        BigDecimal sumaResto = restantes.stream().map(ConceptoCobro::getImporte).reduce(BigDecimal.ZERO, BigDecimal::add);
-                        tareasBancarias.add(new RemesaTaskDTO(v, reciboUnico, restantes, sumaResto, "007",
-                                restantes.stream().map(ConceptoCobro::getDescripcion).collect(Collectors.joining(" / "))));
-                        break;
+            // =====================================================
+            // ASIENTO CONTABLE Y GENERACIÓN DE RECIBO
+            // =====================================================
+            // IMPORTANTE: registrarDevengoCuota ahora debe asignar tipoRemesa y etiquetaExtra al Recibo
+            Recibo reciboUnico =
+                    contabilidadService.registrarDevengoCuota(
+                            v,
+                            totalRecibo,
+                            conceptContable,
+                            (fechaCobro != null) ? fechaCobro.withDayOfMonth(1) : LocalDate.now().withDayOfMonth(1),
+                            tipoRemesa,
+                            etiquetaExtra
+                    );
+
+            // =====================================================
+            // GENERACION DE REGISTROS 03 (Norma 19-14)
+            // =====================================================
+            for (int i = 0; i < lineasRemesa.size(); i++) {
+                LineaRemesaDTO linea = lineasRemesa.get(i);
+                String numeroDato;
+
+                switch (i) {
+                    case 0: numeroDato = "003"; break;
+                    case 1: numeroDato = "004"; break;
+                    case 2: numeroDato = "005"; break;
+                    case 3: numeroDato = "006"; break;
+                    default: numeroDato = "007"; break;
+                }
+
+                // FIX GTI: Solo acumulamos el importe total del recibo y sumamos el adeudo cuando procesamos el bloque principal 003
+                if ("003".equals(numeroDato)) {
+                    numAdeudos003.incrementAndGet();
+                    synchronized (totalRemesaBancaria) {
+                        totalRemesaBancaria.set(totalRemesaBancaria.get().add(totalRecibo));
                     }
+                }
+
+                try {
+                    String referenciaAdeudo = reciboUnico.getId() + hoy + ahora + numeroDato;
+                    String r03 = "03" + CODIGO_NORMA_1915 + numeroDato
+                            + completar(referenciaAdeudo, 35)
+                            + completar(v.getReferenciaMandato(), 35)
+                            + "RCUR" + "    "
+                            // FIX CORRECCIÓN SEPA: El registro principal 003 se estampa con el total unificado. Los desgloses informativos (004, etc.) DEBEN ir rellenos a CERO para no duplicar sumas en los validadores bancarios.
+                            + formatearImporte("003".equals(numeroDato) ? totalRecibo : BigDecimal.ZERO, 11)
+                            + hoy
+                            + completar(v.getBic(), 11)
+                            + completar(v.getNombre(), 70)
+                            + completar(v.getDireccion() != null ? v.getDireccion() : ".", 50)
+                            + completar(v.getPoblacion() != null ? v.getPoblacion() : ".", 50)
+                            + completar(".", 40)
+                            + "ES" + completar("", 72) + "A"
+                            + completar(v.getIban().replace(" ", ""), 34)
+                            + completar("", 4)
+                            + completar(linea.getDescripcion(), 140);
+
+                    registrosDeudores.add(completarRegistro(r03));
+
+                } catch (Exception e) {
+                    log.error("❌ Error generando línea bancaria {}: {}", v.getNombre(), e.getMessage());
                 }
             }
         }
 
-        // ---------------- FASE 2: Generación Bancaria ----------------
-        tareasBancarias.parallelStream().forEach(task -> {
-            Vecino v = task.vecino;
-            try {
-                if (v.isDomiciliado() && v.getIban() != null && !v.getIban().isBlank()) {
-                    if ("003".equals(task.numeroDato)) {
-                        numAdeudos003.incrementAndGet();
-                    }
-
-                    synchronized (totalRemesaBancaria) {
-                        totalRemesaBancaria.set(totalRemesaBancaria.get().add(task.total));
-                    }
-
-                    // REGISTRO 03: Estructura fija de 600 posiciones
-                    String r03 = "03" + CODIGO_NORMA_1915 + task.numeroDato + // 01-10
-                            completar(task.recibo.getId().toString() + hoy + ahora, 35) + // 11-45 (ID)
-                            completar(v.getReferenciaMandato(), 35) + // 46-80 (Referencia)
-                            "RCUR" + "    " + // 81-88
-                            formatearImporte(task.total, 11) + // 89-99 (Importe)
-                            hoy + // 100-107 (Fecha)
-                            completar(v.getBic(), 11) + // 108-118 (BIC)
-                            completar(v.getNombre(), 70) + // 119-188 (Nombre deudor)
-                            completar(v.getDireccion() != null ? v.getDireccion() : ".", 50) + // 189-238 (D1)
-                            completar(v.getPoblacion() != null ? v.getPoblacion() : ".", 50) + // 239-288 (D2)
-                            completar(".", 40) + // 289-328 (D3 - Provincia que faltaba)
-                            "ES" + // 329-330 (País)
-                            completar("", 72) + // 331-402 (Relleno)
-                            "A" + // 403 (Marcador Identificador Cuenta IBAN)
-                            completar(v.getIban().replace(" ", ""), 34) + // 404-437 (IBAN deudor)
-                            completar("", 4) + // 438-441
-                            completar(task.conceptoTexto, 140); // 442-581 (Concepto)
-
-                    registrosDeudores.add(completarRegistro(r03));
-                }
-            } catch (Exception e) { log.error("❌ Error en línea bancaria {}: {}", v.getNombre(), e.getMessage()); }
-        });
-
-        // ---------------- ENSAMBLAJE FINAL DEL FICHERO .C19 ----------------
+        // =========================================================
+        // ENSAMBLAJE FINAL DEL FICHERO .c19
+        // =========================================================
         StringBuilder file = new StringBuilder();
+        String idFicheroRef = "PRE" + hoy + ahora + "000" + idAcreedor.substring(Math.max(0, idAcreedor.length() - 9));
 
-        // R01: Presentador (Aseguramos ID y Entidad)
-        String idFicheroRef = "PRE" + hoy + ahora + "000" + idAcreedor.substring(Math.max(0, idAcreedor.length()-9));
-        String r01 = "01" + CODIGO_NORMA_1915 + "001" +
-                completar(idAcreedor, 35) +
-                completar(comunidad.getNombre(), 70) +
-                hoy +
-                completar(idFicheroRef, 35) + // Pos 124-158
-                completar(entidadOficina, 8) + // Pos 159-166
-                completar("", 434);
+        // REGISTRO 01
+        String r01 = "01" + CODIGO_NORMA_1915 + "001" + completar(idAcreedor, 35) + completar(comunidad.getNombre(), 70) + hoy + completar(idFicheroRef, 35) + completar(entidadOficina, 8) + completar("", 434);
 
-        // R02: Acreedor (Añadimos D3 y País para alinear IBAN en 266)
-        String r02 = "02" + CODIGO_NORMA_1915 + "002" +
-                completar(idAcreedor, 35) +
-                fCobro +
-                completar(comunidad.getNombre(), 70) +
-                completar(comunidad.getDireccion(), 50) +   // 124-173 (D1)
-                completar(comunidad.getPoblacion(), 50) +   // 174-223 (D2)
-                completar(".", 40) +                         // 224-263 (D3 Provincia)
-                "ES" +                                      // 264-265 (País)
-                completar(ibanComunidad, 34) +               // 266-299 (IBAN abono)
-                completar("", 301);
+        // REGISTRO 02
+        String r02 = "02" + CODIGO_NORMA_1915 + "002" + completar(idAcreedor, 35) + fCobro + completar(comunidad.getNombre(), 70) + completar(comunidad.getDireccion(), 50) + completar(comunidad.getPoblacion(), 50) + completar(".", 40) + "ES" + completar(ibanComunidad, 34) + completar("", 301);
 
-        file.append(completarRegistro(r01)).append("\n").append(completarRegistro(r02)).append("\n");
-        for (String r : registrosDeudores) { file.append(r).append("\n"); }
+        file.append(completarRegistro(r01)).append("\n");
+        file.append(completarRegistro(r02)).append("\n");
 
-        // --- CÁLCULOS PARA CIERRES ---
+        for (String r : registrosDeudores) {
+            file.append(r).append("\n");
+        }
+
+        // TOTALES Y CIERRES (04, 05, 99)
         BigDecimal sumaFinal = totalRemesaBancaria.get();
         int adeudosUnicos = numAdeudos003.get();
-
-        // Conteo para Registro 04: Incluye cabecera 02, todos los deudores 03 y el propio 04
         int count04 = 1 + registrosDeudores.size() + 1;
-
-        // Conteo para Registro 05: Incluye todo lo anterior más el propio 05 (Total 12 en tu caso)
         int count05 = count04 + 1;
-
-        // Conteo para Registro 99: Incluye registro 01, el bloque anterior y el propio 99 (Total 14)
         int totalRegistrosFichero = 1 + count05 + 1;
 
-        // R04: Totales Acreedor por Fecha (Pág 32 PDF)
-        String r04 = "04" + completar(idAcreedor, 35) + fCobro + formatearImporte(sumaFinal, 17) +
-                padLeft(String.valueOf(adeudosUnicos), 8, '0') +
-                padLeft(String.valueOf(count04), 10, '0');
+        String r04 = "04" + completar(idAcreedor, 35) + fCobro + formatearImporte(sumaFinal, 17) + padLeft(String.valueOf(adeudosUnicos), 8, '0') + padLeft(String.valueOf(count04), 10, '0');
         file.append(completarRegistro(r04)).append("\n");
 
-        // R05: Totales Ordenante / Acreedor General (Pág 34 PDF)
-        String r05 = "05" + completar(idAcreedor, 35) + formatearImporte(sumaFinal, 17) +
-                padLeft(String.valueOf(adeudosUnicos), 8, '0') +
-                padLeft(String.valueOf(count05), 10, '0');
+        String r05 = "05" + completar(idAcreedor, 35) + formatearImporte(sumaFinal, 17) + padLeft(String.valueOf(adeudosUnicos), 8, '0') + padLeft(String.valueOf(count05), 10, '0');
         file.append(completarRegistro(r05)).append("\n");
 
-        // R99: Totales General (Pág 35 PDF)
-        String r99 = "99" +
-                formatearImporte(sumaFinal, 17) +
-                padLeft(String.valueOf(adeudosUnicos), 8, '0') +
-                padLeft(String.valueOf(totalRegistrosFichero), 10, '0');
+        String r99 = "99" + formatearImporte(sumaFinal, 17) + padLeft(String.valueOf(adeudosUnicos), 8, '0') + padLeft(String.valueOf(totalRegistrosFichero), 10, '0');
         file.append(completarRegistro(r99)).append("\n");
-        // Validación final
+
+        // VALIDACION FINAL
         List<String> errores = validator.validarFichero(file.toString());
-        if (!errores.isEmpty()) throw new RuntimeException("❌ REMESA INVÁLIDA: " + errores.get(0));
+        if (!errores.isEmpty()) {
+            throw new RuntimeException("❌ REMESA INVÁLIDA: " + errores.get(0));
+        }
 
         return file.toString();
     }
@@ -291,53 +349,60 @@ public class SepaService {
     }
 
     private String generarTextoConcepto(Vecino v, List<ConceptoCobro> conceptos) {
-
         String descripcion = conceptos.stream()
                 .map(ConceptoCobro::getDescripcion)
                 .collect(Collectors.joining(" / "));
-
         String finca = (v.getVivienda() != null) ? v.getVivienda() : "";
-
         String resultado = ("CUOTA COMUNIDAD " + finca + ": " + descripcion).trim();
-
         return resultado.length() > 140 ? resultado.substring(0, 140) : resultado;
     }
 
     private List<ConceptoCobro> filtrarConceptosPorPeriodo(Vecino v, int mesRemesa) {
-
         List<ConceptoCobro> aptos = new ArrayList<>();
-
         if (v.getListaConceptos() == null) return aptos;
-
         for (ConceptoCobro cc : v.getListaConceptos()) {
-
             if (cc != null && cc.isActivo() && cc.getImporte() != null
                     && cc.getImporte().compareTo(BigDecimal.ZERO) > 0) {
-
                 aptos.add(cc);
             }
         }
-
         return aptos;
     }
 
-
-
-    private static class RemesaTaskDTO {
-        Vecino vecino;
-        Recibo recibo;
-        List<ConceptoCobro> conceptos;
-        BigDecimal total;
-        String numeroDato; // Asegúrate de que esta línea sea String
-        String conceptoTexto;
-
-        RemesaTaskDTO(Vecino v, Recibo r, List<ConceptoCobro> c, BigDecimal t, String nd, String txt) {
-            this.vecino = v;
-            this.recibo = r;
-            this.conceptos = c;
-            this.total = t;
-            this.numeroDato = nd; // Y aquí también
-            this.conceptoTexto = txt;
+    /**
+     * =====================================================
+     * DTO INTERNO PARA DESGLOSE DE REMESA
+     * =====================================================
+     */
+    private static class LineaRemesaDTO {
+        private String descripcion;
+        private BigDecimal importe;
+        public LineaRemesaDTO(
+                String descripcion,
+                BigDecimal importe
+        ) {
+            this.descripcion = descripcion;
+            this.importe = importe;
         }
+        public String getDescripcion() {
+            return descripcion;
+        }
+        public void setDescripcion(String descripcion) {
+            this.descripcion = descripcion;
+        }
+        public BigDecimal getImporte() {
+            return importe;
+        }
+        public void setImporte(BigDecimal importe) {
+            this.importe = importe;
+        }
+    }
+
+    /**
+     * Método puente para generar cuaderno 19 desde controladores antiguos (Bancos, Comunidad, Recibo)
+     */
+    public String generarCuaderno19(Comunidad comunidad, List<Vecino> vecinos, LocalDate fechaCobro) {
+        // Por defecto, las llamadas antiguas se tratan como ORDINARIAS y SUSTITUIR = TRUE
+        return this.generarCuaderno19(comunidad, vecinos, fechaCobro, "ORDINARIA", null, true);
     }
 }

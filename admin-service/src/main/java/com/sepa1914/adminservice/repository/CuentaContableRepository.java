@@ -69,4 +69,9 @@ public interface CuentaContableRepository extends JpaRepository<CuentaContable, 
     boolean existsByTipo(TipoCuenta tipo);
 
     List<CuentaContable> findByComunidadIdOrderByCodigoAsc(Long comunidadId);
+    /**
+     * NUEVO MÉTODO GTI: Búsqueda paginada y filtrada por código o nombre de cuenta.
+     */
+    @Query("SELECT c FROM CuentaContable c WHERE c.comunidad.id = :comunidadId AND (c.codigo LIKE %:texto% OR LOWER(c.nombre) LIKE LOWER(CONCAT('%', :texto, '%')))")
+    Page<CuentaContable> buscarPorComunidadYTexto(@Param("comunidadId") Long comunidadId, @Param("texto") String texto, Pageable pageable);
 }

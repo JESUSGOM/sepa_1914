@@ -13,6 +13,20 @@
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <h1 class="h2"><i class="bi bi-building text-primary"></i> Gestión de Comunidades</h1>
                 <div class="btn-toolbar mb-2 mb-md-0 gap-2">
+                    <!-- Buscador integrado -->
+                    <form th:action="@{/comunidades/lista}" method="get" class="d-flex me-3">
+                        <div class="input-group input-group-sm shadow-sm">
+                            <input type="text" name="buscar" th:value="${searchTerm}"
+                                   class="form-control" placeholder="Buscar finca..." aria-label="Buscar">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <a th:if="${searchTerm}" th:href="@{/comunidades/lista}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i>
+                            </a>
+                        </div>
+                    </form>
+
                     <a th:href="@{/comunidades/informe-global-pdf}" class="btn btn-sm btn-outline-danger shadow-sm" title="Descargar relación de todas las fincas">
                         <i class="bi bi-file-earmark-pdf-fill"></i> Informe General
                     </a>
@@ -22,8 +36,10 @@
                 </div>
             </div>
 
-            <div th:if="${param.exito}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
-                <i class="bi bi-check-circle-fill me-2"></i> Comunidad guardada correctamente.
+            <!-- Alerta de éxito corregida para evitar error 500 -->
+            <div th:if="${param.exito != null or mensaje != null}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <span th:text="${mensaje != null ? mensaje : 'Operación realizada correctamente.'}">Comunidad guardada correctamente.</span>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
             </div>
 
@@ -33,7 +49,11 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-dark">
                             <tr>
-                                <th class="ps-4" style="width: 25%;">Finca / Identificador</th>
+                                <th class="ps-4" style="width: 25%;">
+                                    <a th:href="@{/comunidades/lista(page=${currentPage}, buscar=${searchTerm}, sortField='nombre', sortDir=${reverseSortDir})}" class="text-white text-decoration-none">
+                                        Finca / Identificador <i class="bi" th:classappend="${sortField == 'nombre' ? (sortDir == 'asc' ? 'bi-sort-alpha-down' : 'bi-sort-alpha-up') : ''}"></i>
+                                    </a>
+                                </th>
                                 <th style="width: 20%;">Datos Bancarios</th>
                                 <th style="width: 15%;">Ubicación</th>
                                 <th class="text-center" style="width: 40%;">Operativa y Contabilidad</th>
@@ -71,6 +91,7 @@
 
                                     <div class="btn-group btn-group-sm me-2 shadow-sm" role="group">
                                         <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}" class="btn btn-info text-white" title="Vecinos"><i class="bi bi-people"></i></a>
+                                        <!-- Botón que activa el modal -->
                                         <button type="button" class="btn btn-dark" data-bs-toggle="modal" th:data-bs-target="'#modalFecha' + ${comunidad.id}" title="Cuaderno .C19">
                                             <i class="bi bi-file-earmark-binary"></i>
                                         </button>
@@ -90,29 +111,111 @@
                                     </div>
                                 </td>
                             </tr>
+                            <tr th:if="${totalItems == 0}">
+                                <td colspan="4" class="text-center py-5 text-muted">
+                                    <i class="bi bi-search h1 d-block mb-3"></i>
+                                    No se han encontrado comunidades.
+                                </td>
+                            </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
+            <!-- Paginación funcional[cite: 6] -->
+            <div class="d-flex justify-content-between align-items-center mt-3" th:if="${totalPages > 0}">
+                <div class="small text-muted">
+                    Mostrando <span th:text="${comunidades.size()}">0</span> de <span th:text="${totalItems}">0</span> fincas.
+                </div>
+
+                <nav aria-label="Paginación" th:if="${totalPages > 1}">
+                    <ul class="pagination pagination-sm mb-0 shadow-sm">
+                        <li class="page-item" th:classappend="${currentPage == 0} ? 'disabled'">
+                            <a class="page-link" th:href="@{/comunidades/lista(page=${currentPage - 1}, buscar=${searchTerm}, sortField=${sortField}, sortDir=${sortDir})}">Anterior</a>
+                        </li>
+                        <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}" th:classappend="${currentPage == i} ? 'active'">
+                            <a class="page-link" th:href="@{/comunidades/lista(page=${i}, buscar=${searchTerm}, sortField=${sortField}, sortDir=${sortDir})}" th:text="${i + 1}">1</a>
+                        </li>
+                        <li class="page-item" th:classappend="${currentPage + 1 == totalPages} ? 'disabled'">
+                            <a class="page-link" th:href="@{/comunidades/lista(page=${currentPage + 1}, buscar=${searchTerm}, sortField=${sortField}, sortDir=${sortDir})}">Siguiente</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+
             <div class="mt-4 p-3 bg-white rounded border shadow-sm small">
                 <div class="row align-items-center text-center text-md-start">
-                    <div class="col-md-7 border-md-end">
-                        <span class="text-secondary text-uppercase fw-bold" style="font-size: 0.65rem;">Módulo de Contabilidad Profesional</span><br>
-                        <span class="me-3"><i class="bi bi-qr-code text-success"></i> QR Incidencias</span>
-                        <span class="me-3"><i class="bi bi-bank text-success"></i> Ingresos</span>
-                        <span class="me-3"><i class="bi bi-receipt text-warning"></i> Facturas</span>
-                    </div>
-                    <div class="col-md-5 ps-md-4 mt-2 mt-md-0">
-                        <span class="text-secondary text-uppercase fw-bold" style="font-size: 0.65rem;">Herramientas SEPA</span><br>
-                        <span class="me-3"><i class="bi bi-file-earmark-binary text-dark"></i> Cuaderno .C19</span>
-                        <span class="me-3"><i class="bi bi-file-earmark-pdf text-danger"></i> Reporte PDF</span>
+                    <div class="col-md-7 border-md-end text-muted small">
+                        <span class="text-uppercase fw-bold" style="font-size: 0.65rem;">Módulo de Contabilidad Profesional</span><br>
+                        <i class="bi bi-qr-code text-success me-1"></i> QR Incidencias | <i class="bi bi-bank text-success mx-1"></i> Ingresos | <i class="bi bi-receipt text-warning mx-1"></i> Facturas
                     </div>
                 </div>
             </div>
         </main>
     </div>
 </div>
+
+!-- Modales para generación de .C19 con Periodo Contable -->
+<div th:each="comunidad : ${comunidades}" class="modal fade" th:id="'modalFecha' + ${comunidad.id}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <form th:action="@{/comunidades/generar-remesa}" method="post">
+            <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h6 class="modal-title small"><i class="bi bi-calendar-check me-2"></i>Remesa .C19</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Fecha Cobro (Banco):</label>
+                        <input type="date" name="fechaVencimiento" class="form-control form-control-sm" required>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-7">
+                            <label class="form-label small fw-bold">Mes:</label>
+                            <select name="mes" class="form-select form-select-sm" required>
+                                <option value="1">Enero</option><option value="2">Febrero</option>
+                                <option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option>
+                                <option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option>
+                                <option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label small fw-bold">Año:</label>
+                            <input type="number" name="anio" class="form-control form-control-sm"
+                                   th:value="${#dates.format(#dates.createNow(), 'yyyy')}" required>
+                        </div>
+                    </div>
+
+                    <div class="bg-light p-2 rounded border">
+                        <label class="form-label x-small fw-bold text-primary d-block mb-2">¿QUÉ DESEA HACER?</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="sustituir" th:id="'nueva' + ${comunidad.id}" value="false" checked>
+                            <label class="form-check-label small" th:for="'nueva' + ${comunidad.id}">Remesa NUEVA</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="sustituir" th:id="'modificar' + ${comunidad.id}" value="true">
+                            <label class="form-check-label small text-danger fw-bold" th:for="'modificar' + ${comunidad.id}">MODIFICAR anterior</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="submit" class="btn btn-sm btn-primary w-100 shadow-sm">
+                        <i class="bi bi-file-earmark-arrow-down me-1"></i> Generar y Contabilizar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- IMPORTANTE: Llamada obligatoria a los scripts para que el botón funcione -->
+<div th:replace="~{layout :: scripts}"></div>
+
 </body>
 </html>

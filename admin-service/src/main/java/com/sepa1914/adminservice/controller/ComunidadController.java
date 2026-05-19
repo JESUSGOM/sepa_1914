@@ -23,6 +23,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @Controller
 @RequestMapping("/comunidades")
@@ -63,12 +67,42 @@ public class ComunidadController {
     }
 
     @GetMapping("/lista")
-    public String listarComunidades(Model model, Authentication auth) {
+    public String listarComunidades(
+            @RequestParam(value = "buscar", required = false) String buscar,
+            @RequestParam(value = "page", defaultValue = "0") Integer page,
+            @RequestParam(value = "size", defaultValue = "5") Integer size,
+            @RequestParam(value = "sortField", defaultValue = "nombre") String sortField,
+            @RequestParam(value = "sortDir", defaultValue = "asc") String sortDir,
+            Model model,
+            Authentication auth) {
+
         Usuario actual = getUsuarioLogueado(auth);
         contabilidadService.sincronizarContabilidadExistente(actual.getId());
-        List<Comunidad> misComunidades = comunidadRepository.findByAdministrador(actual);
+
+        int pageNum = (page == null) ? 0 : page;
+        int pageSize = (size == null) ? 5 : size;
+
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortField).descending() : Sort.by(sortField).ascending();
+        Pageable pageable = PageRequest.of(pageNum, pageSize, sort);
+        Page<Comunidad> paginaComunidades;
+
+        if (buscar != null && !buscar.trim().isEmpty()) {
+            paginaComunidades = comunidadRepository.buscarPorAdminYTexto(actual, buscar, pageable);
+        } else {
+            paginaComunidades = comunidadRepository.findByAdministrador(actual, pageable);
+        }
+
         model.addAttribute("activePage", "comunidades");
-        model.addAttribute("comunidades", misComunidades);
+        model.addAttribute("comunidades", paginaComunidades.getContent());
+        model.addAttribute("pagina", paginaComunidades);
+        model.addAttribute("currentPage", pageNum);
+        model.addAttribute("totalPages", paginaComunidades.getTotalPages());
+        model.addAttribute("totalItems", paginaComunidades.getTotalElements());
+        model.addAttribute("searchTerm", buscar);
+        model.addAttribute("sortField", sortField);
+        model.addAttribute("sortDir", sortDir);
+        model.addAttribute("reverseSortDir", sortDir.equals("asc") ? "desc" : "asc");
+
         return "comunidades-lista";
     }
 
@@ -116,24 +150,48 @@ public class ComunidadController {
         return "redirect:/comunidades/lista";
     }
 
-    // --- CORRECCIÓN AQUÍ: Puntos de entrada para guardar y actualizar ---
-
     @PostMapping("/guardar")
     public String guardarComunidad(@ModelAttribute Comunidad comunidad, Authentication auth, RedirectAttributes redirectAttributes) {
-        // Llamamos al helper con esNueva = true
         return procesarPersistenciaComunidad(comunidad, auth, redirectAttributes, true);
     }
 
+    /**
+     * Endpoint corregido para actualización de comunidades.
+     * Recupera la entidad persistida para conservar sus relaciones y colecciones de base de datos.
+     */
     @PostMapping("/actualizar/{id}")
-    public String actualizarComunidad(@PathVariable Long id, @ModelAttribute Comunidad comunidad, Authentication auth, RedirectAttributes redirectAttributes) {
-        comunidad.setId(id);
-        // Llamamos al helper con esNueva = false
-        return procesarPersistenciaComunidad(comunidad, auth, redirectAttributes, false);
+    public String actualizarComunidad(@PathVariable Long id, @ModelAttribute Comunidad comunidadForm, Authentication auth, RedirectAttributes redirectAttributes) {
+        Usuario actual = getUsuarioLogueado(auth);
+
+        // 1. Buscamos el registro real y original de la base de datos
+        Comunidad comunidadAPersistir = comunidadRepository.findById(id)
+                .filter(c -> c.getAdministrador().getId().equals(actual.getId()))
+                .orElseThrow(() -> new RuntimeException("No existe o no tiene permisos para actualizar esta comunidad."));
+
+        // 2. Volcamos exclusivamente los campos modificados desde el formulario HTML
+        comunidadAPersistir.setNombre(comunidadForm.getNombre());
+        comunidadAPersistir.setDireccion(comunidadForm.getDireccion());
+        comunidadAPersistir.setPoblacion(comunidadForm.getPoblacion());
+        comunidadAPersistir.setCodigoPostal(comunidadForm.getCodigoPostal());
+        comunidadAPersistir.setIdentificadorAcreedor(comunidadForm.getIdentificadorAcreedor());
+        comunidadAPersistir.setIban(comunidadForm.getIban());
+        comunidadAPersistir.setBic(comunidadForm.getBic());
+        comunidadAPersistir.setTipoReparto(comunidadForm.getTipoReparto());
+
+        // 3. Validamos el CIF/NIF sobre el objeto definitivo
+        String cif = comunidadAPersistir.getIdentificadorAcreedor();
+        if (cif != null && !cif.isEmpty() && !validarCIF(cif)) {
+            redirectAttributes.addFlashAttribute("error", "CIF/NIF inválido.");
+            return "redirect:/comunidades/editar/" + id;
+        }
+
+        // 4. Guardamos la entidad vinculada (provocará un UPDATE limpio en la tabla)
+        comunidadRepository.save(comunidadAPersistir);
+
+        redirectAttributes.addFlashAttribute("mensaje", "Comunidad actualizada correctamente");
+        return "redirect:/comunidades/lista";
     }
 
-    /**
-     * Helper privado único para procesar la lógica de guardado
-     */
     private String procesarPersistenciaComunidad(Comunidad comunidadForm, Authentication auth, RedirectAttributes redirectAttributes, boolean esNueva) {
         Usuario actual = getUsuarioLogueado(auth);
         Comunidad comunidadAPersistir;
@@ -156,14 +214,12 @@ public class ComunidadController {
 
         comunidadAPersistir.setAdministrador(actual);
 
-        // Validaciones
         String cif = comunidadAPersistir.getIdentificadorAcreedor();
         if (cif != null && !cif.isEmpty() && !validarCIF(cif)) {
             redirectAttributes.addFlashAttribute("error", "CIF/NIF inválido.");
             return esNueva ? "redirect:/comunidades/nueva" : "redirect:/comunidades/editar/" + comunidadForm.getId();
         }
 
-        // Guardado usando el repositorio directamente (ya que no existe comunidadService)
         Comunidad guardada = comunidadRepository.save(comunidadAPersistir);
 
         if (esNueva) {
@@ -174,8 +230,6 @@ public class ComunidadController {
         redirectAttributes.addFlashAttribute("mensaje", esNueva ? "Comunidad creada con éxito" : "Comunidad actualizada correctamente");
         return "redirect:/comunidades/lista";
     }
-
-    // --- FIN DE LA CORRECCIÓN ---
 
     private boolean validarCIF(String cif) {
         if (cif == null || cif.length() != 9) return false;
@@ -267,11 +321,8 @@ public class ComunidadController {
         List<Comunidad> misComunidades = comunidadRepository.findByAdministrador(actual);
 
         try {
-            // Utilizamos el pdfService ya inyectado en tu controlador
             byte[] pdfContent = pdfService.generarInformeGlobal(misComunidades);
-
             String nombreArchivo = "INFORME_GLOBAL_" + LocalDate.now() + ".pdf";
-
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_PDF)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombreArchivo + "\"")
@@ -299,21 +350,75 @@ public class ComunidadController {
                     .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
 
             byte[] pdfBytes = qrPdfService.generarPdfSoloQr(comunidad);
-
             String filename = "QR_INCIDENCIAS_" + comunidad.getNombre().replace(" ", "_") + ".pdf";
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(pdfBytes);
-
         } catch (Exception e) {
             log.error("Error generando PDF del QR: {}", e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
     }
 
+    @PostMapping("/generar-remesa")
+    public ResponseEntity<byte[]> generarRemesa(
+            @RequestParam("comunidadId") Long id,
+            @RequestParam("fechaVencimiento") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaVencimiento,
+            @RequestParam("mes") int mes,
+            @RequestParam("anio") int anio,
+            @RequestParam(value = "sustituir", defaultValue = "false") boolean sustituir,
+            Authentication auth) {
 
+        if (!licenseService.validarLicencia()) {
+            log.warn("Descarga bloqueada: El equipo [{}] no dispone de licencia activa.", licenseService.getEquipoID());
+            String mensajeInformativo = "SISTEMA NO ACTIVADO. ID de su equipo: " + licenseService.getEquipoID();
+            return ResponseEntity.status(402).contentType(MediaType.TEXT_PLAIN).body(mensajeInformativo.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Usuario actual = getUsuarioLogueado(auth);
+        Comunidad comunidad = comunidadRepository.findById(id)
+                .filter(c -> c.getAdministrador().getId().equals(actual.getId()))
+                .orElseThrow(() -> new RuntimeException("Sin permisos"));
+
+        if (sustituir) {
+            log.info("GTI: El usuario eligió MODIFICAR. Borrando datos previos de {}/{}", mes, anio);
+            contabilidadService.borrarRecibosYcontabilidadDelMes(id, mes, anio, "ORDINARIA", null, true);
+        }
+
+        List<Vecino> vecinos = vecinoRepository.findByComunidad(comunidad);
+
+        String contenido = sepaService.generarCuaderno19(
+                comunidad,
+                vecinos,
+                fechaVencimiento,
+                "ORDINARIA",
+                null,
+                sustituir
+        );
+
+        BigDecimal totalRemesa = vecinos.stream()
+                .filter(Vecino::isDomiciliado)
+                .map(Vecino::getImporteTotalConceptos)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        FicheroGenerado historico = new FicheroGenerado();
+        historico.setComunidad(comunidad);
+        historico.setIdentificadorFichero("REM-" + System.currentTimeMillis());
+        historico.setTotalImporte(totalRemesa);
+        historico.setNumeroRecibos((int) vecinos.stream().filter(Vecino::isDomiciliado).count());
+        historico.setNombreArchivo("REMESA_" + normalizarNombreFichero(comunidad.getNombre()) + "_" +
+                fechaVencimiento.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) + ".c19");
+        historico.setContenido(contenido);
+        ficheroRepository.save(historico);
+
+        byte[] data = contenido.getBytes(StandardCharsets.UTF_8);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + historico.getNombreArchivo() + "\"")
+                .body(data);
+    }
 
 //    @GetMapping("/migrar-comunidades-seguras")
 //    @ResponseBody

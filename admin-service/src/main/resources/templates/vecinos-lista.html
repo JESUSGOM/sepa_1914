@@ -9,7 +9,6 @@
         <div th:replace="~{layout :: menu}"></div>
 
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-            <!-- Migas de pan -->
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb small">
                     <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
@@ -18,14 +17,12 @@
                 </ol>
             </nav>
 
-            <!-- Cabecera Principal con Buscador -->
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <h1 class="h2">
                     <i class="bi bi-people-fill text-primary me-2"></i>
                     Propietarios y Coeficientes
                 </h1>
 
-                <!-- BLOQUE DE BÚSQUEDA -->
                 <form th:action="@{/vecinos/lista}" method="get" class="d-flex gap-2 ms-auto me-3">
                     <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
                     <div class="input-group input-group-sm">
@@ -42,59 +39,46 @@
                 </div>
             </div>
 
-            <!-- Alerta de Mensajes -->
             <div th:if="${mensaje}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
                 <i class="bi bi-check-circle-fill me-2"></i>
                 <span th:text="${mensaje}">Mensaje de éxito</span>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
 
-            <!-- Tabla de Datos -->
             <div class="card shadow-sm border-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0" id="tablaVecinos" style="font-size: 0.88rem;">
                         <thead class="table-dark">
                         <tr>
                             <th class="ps-3">Vivienda</th>
-                            <th>Nombre y NIF</th>
-                            <th>IBAN / SEPA</th>
-                            <th>Estado</th>
-                            <th class="text-end pe-3">Gestión</th>
-                        </tr>
+                            <th>Nombre Propietario</th> <th>NIF / CIF</th>          <th>IBAN Cuenta</th>        <th class="text-center">SEPA</th> <th class="text-center">Estado</th> <th class="text-end pe-3 no-sort">Gestión</th> </tr>
                         </thead>
                         <tbody>
                         <tr th:each="v : ${vecinos}">
                             <td class="ps-3 fw-bold" th:text="${v.vivienda}">1A</td>
+                            <td th:text="${v.nombre}" class="fw-semibold">Nombre</td>
+                            <td th:text="${v.nif}" class="text-muted">NIF</td>
                             <td>
-                                <div class="fw-bold" th:text="${v.nombre}">Nombre del Vecino</div>
-                                <small class="text-muted" th:text="${v.nif}">NIF/DNI</small>
+                                <code class="text-primary" th:text="${v.iban}">IBAN</code>
                             </td>
-                            <td>
-                                <code class="small text-primary" th:text="${v.iban}">IBAN</code>
-                                <div class="small mt-1">
-                                    <span th:if="${v.domiciliado}" class="badge bg-success"><i class="bi bi-bank me-1"></i> SEPA</span>
-                                    <span th:unless="${v.domiciliado}" class="badge bg-secondary"><i class="bi bi-cash me-1"></i> MANUAL</span>
-                                </div>
+                            <td class="text-center">
+                                <span th:if="${v.domiciliado}" class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-bank"></i></span>
+                                <span th:unless="${v.domiciliado}" class="badge bg-light text-muted border"><i class="bi bi-cash"></i></span>
                             </td>
-                            <td>
+                            <td class="text-center">
                                 <span class="badge rounded-pill" th:classappend="${v.activo ? 'bg-success' : 'bg-danger'}" th:text="${v.activo ? 'Activo' : 'Baja'}">Activo</span>
                             </td>
                             <td class="text-end pe-3">
                                 <div class="btn-group shadow-sm">
-                                    <!-- Conceptos de Cobro -->
                                     <a th:href="@{/conceptos/vecino/{id}(id=${v.id})}" class="btn btn-sm btn-outline-dark" title="Conceptos de Cobro">
                                         <i class="bi bi-list-stars"></i>
                                     </a>
-
-                                    <!-- Mandato PDF (Solo si tiene IBAN) -->
                                     <a th:if="${v.iban != null and !#strings.isEmpty(v.iban)}"
                                        th:href="@{/vecinos/mandato-pdf/{id}(id=${v.id})}"
                                        class="btn btn-sm btn-outline-danger"
                                        title="Guardar Mandato SEPA en Disco Local">
                                         <i class="bi bi-file-earmark-check"></i>
                                     </a>
-
-                                    <!-- Editar (Modal) -->
                                     <button type="button" class="btn btn-sm btn-warning"
                                             th:data-id="${v.id}"
                                             th:data-nombre="${v.nombre}"
@@ -111,8 +95,6 @@
                                             title="Editar Datos">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
-
-                                    <!-- Eliminar (Con confirmación) -->
                                     <a th:href="@{/vecinos/eliminar/{id}(id=${v.id})}"
                                        class="btn btn-sm btn-danger"
                                        onclick="return confirm('¿Eliminar propiedad y todos sus datos asociados?')"
@@ -127,7 +109,6 @@
                 </div>
             </div>
 
-            <!-- BLOQUE DE PAGINACIÓN -->
             <nav th:if="${totalPages > 1}" class="mt-4">
                 <ul class="pagination pagination-sm justify-content-center shadow-sm">
                     <li class="page-item" th:classappend="${currentPage == 0} ? 'disabled'">
@@ -149,7 +130,6 @@
     </div>
 </div>
 
-<!-- Modal de Edición (Respetado Íntegramente) -->
 <div class="modal fade" id="modalEditarVecino" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content shadow-lg border-0">
@@ -196,12 +176,33 @@
                         </div>
                         <div class="col-12 mt-4 pt-3 border-top">
                             <div class="form-check form-switch d-inline-block me-4">
-                                <input class="form-check-input" type="checkbox" name="domiciliado" id="editDom">
-                                <label class="form-check-label fw-bold">¿DOMICILIAR RECIBOS?</label>
+
+                                <input type="hidden" name="_domiciliado" value="on"/>
+
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       name="domiciliado"
+                                       id="editDom">
+
+                                <label class="form-check-label fw-bold">
+                                    ¿DOMICILIAR RECIBOS?
+                                </label>
+
                             </div>
+
                             <div class="form-check form-switch d-inline-block">
-                                <input class="form-check-input" type="checkbox" name="activo" id="editActivo">
-                                <label class="form-check-label fw-bold">Vecino Activo</label>
+
+                                <input type="hidden" name="_activo" value="on"/>
+
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       name="activo"
+                                       id="editActivo">
+
+                                <label class="form-check-label fw-bold">
+                                    Vecino Activo
+                                </label>
+
                             </div>
                         </div>
                     </div>
@@ -215,8 +216,33 @@
     </div>
 </div>
 
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
 <div th:replace="~{layout :: scripts}"></div>
-<script>
+
+<script th:inline="none">
+    $(document).ready(function() {
+        if ($.fn.DataTable.isDataTable('#tablaVecinos')) {
+            $('#tablaVecinos').DataTable().destroy();
+        }
+
+        $('#tablaVecinos').DataTable({
+            "language": {
+                "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
+            },
+            "paging": false,
+            "searching": false,
+            "info": false,
+            "columnDefs": [
+                { "orderable": false, "targets": "no-sort" }
+            ],
+            "order": [[0, 'asc']]
+        });
+    });
+
     function cargarYMostrarModal(btn) {
         document.getElementById('editId').value = btn.getAttribute('data-id');
         document.getElementById('editNombre').value = btn.getAttribute('data-nombre');
@@ -237,6 +263,9 @@
 <style>
     .font-monospace { font-family: 'Courier New', monospace; letter-spacing: 1px; }
     .table-hover tbody tr:hover { background-color: rgba(13, 110, 253, 0.05); }
+    .dataTables_wrapper { padding: 0; }
+    table.dataTable thead th { border-bottom: none !important; }
+    .table td { padding: 0.4rem 0.5rem; }
 </style>
 </body>
 </html>

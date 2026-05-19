@@ -1,6 +1,8 @@
 package com.sepa1914.adminservice.repository;
 
 import com.sepa1914.adminservice.model.MovimientoBancario;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,10 +18,10 @@ import java.util.List;
 public interface MovimientoBancarioRepository extends JpaRepository<MovimientoBancario, Long> {
 
     /**
-     * Recupera todos los movimientos de una comunidad.
+     * Recupera todos los movimientos de una comunidad con soporte de paginación real.
      * Esencial para el cálculo de saldos y métricas del Dashboard.
      */
-    List<MovimientoBancario> findByComunidadId(Long comunidadId);
+    Page<MovimientoBancario> findByComunidadId(Long comunidadId, Pageable pageable);
 
     /**
      * Obtiene el histórico de movimientos de una comunidad ordenado por fecha descendente.
@@ -32,6 +34,12 @@ public interface MovimientoBancarioRepository extends JpaRepository<MovimientoBa
      * Vital para los procesos de conciliación manual e inteligente.
      */
     List<MovimientoBancario> findByComunidadIdAndConciliadoFalse(Long comunidadId);
+
+    /**
+     * Busca movimientos por comunidad e importe exacto con soporte para paginación.
+     * Necesario para la búsqueda avanzada del extracto bancario.
+     */
+    Page<MovimientoBancario> findByComunidadIdAndImporte(Long comunidadId, BigDecimal importe, Pageable pageable);
 
     /**
      * Método crítico para evitar duplicidad de apuntes al importar varios ficheros.
@@ -47,11 +55,7 @@ public interface MovimientoBancarioRepository extends JpaRepository<MovimientoBa
      * NUEVO MÉTODO: Añadido para compatibilidad con la validación por concepto del Controller.
      * NO ELIMINA NINGUNA FUNCIONALIDAD ANTERIOR.
      */
-    boolean existsByFechaOperacionAndImporteAndConcepto(
-            LocalDate fechaOperacion,
-            BigDecimal importe,
-            String concepto
-    );
+    boolean existsByFechaOperacionAndImporteAndConcepto(LocalDate fecha, BigDecimal importe, String concepto);
 
     /**
      * Busca movimientos por un importe exacto que no estén conciliados.

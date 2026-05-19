@@ -22,6 +22,8 @@ import java.util.List;
 @Repository
 public interface MovimientoContableRepository extends JpaRepository<MovimientoContable, Long> {
 
+    @Modifying
+    @Transactional
     void deleteByComunidadId(Long comunidadId);
 
     /**
@@ -154,4 +156,8 @@ public interface MovimientoContableRepository extends JpaRepository<MovimientoCo
     List<Object[]> obtenerSaldosPorRango(@Param("comId") Long comId,
                                          @Param("inicio") LocalDate inicio,
                                          @Param("fin") LocalDate fin);
+
+    @Modifying
+    @Transactional
+    void deleteByComunidadIdAndConceptoContaining(Long comunidadId, String concepto);
 }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
  * 1. Conciliación automática unitaria.
  * 2. Conciliación manual múltiple (Remesas SEPA).
  * 3. Reparto en cascada para pagos parciales o acumulados (Transferencias).
+ * 4. NUEVO: Agrupación de múltiples apuntes bancarios (Remesas fragmentadas).
  */
 @Service
 public class ConciliacionService {
@@ -35,6 +37,14 @@ public class ConciliacionService {
     private MovimientoBancarioRepository movRepository;
 
     /**
+     * NUEVO MÉTODO GTI: Obtiene los recibos pendientes o devueltos de una comunidad.
+     */
+    public List<Recibo> obtenerRecibosPendientes(Long comunidadId) {
+        return reciboRepository.findByComunidadIdAndEstadoIn(
+                comunidadId, List.of(EstadoRecibo.PENDIENTE, EstadoRecibo.DEVUELTO));
+    }
+
+    /**
      * FUNCIONALIDAD MANTENIDA:
      * Ejecuta la conciliación automática cruzando datos de la Norma 43 con los recibos.
      */
@@ -44,7 +54,6 @@ public class ConciliacionService {
         int conciliadosCount = 0;
 
         for (MovimientoBancario mov : movimientos) {
-            // Buscamos recibos pendientes que coincidan EXACTAMENTE en el importe
             List<Recibo> candidatos = reciboRepository.findByComunidadIdAndImporteAndEstado(
                     comunidadId, mov.getImporte(), EstadoRecibo.PENDIENTE);
 
@@ -69,7 +78,6 @@ public class ConciliacionService {
     /**
      * FUNCIONALIDAD MANTENIDA Y MEJORADA: Conciliación Múltiple (Manual).
      * Vincula un único movimiento (ej: abono remesa 487,68€) con varios recibos.
-     * Ahora usa registrarPago() para asegurar que el pagadoAcumulado sea correcto.
      */
     @Transactional
     public void vincularMovimientoConVariosRecibos(Long movimientoId, List<Long> reciboIds) {
@@ -80,7 +88,6 @@ public class ConciliacionService {
             Recibo recibo = reciboRepository.findById(reciboId)
                     .orElseThrow(() -> new RuntimeException("Recibo no encontrado ID: " + reciboId));
 
-            // Marcamos el pago total del recibo
             recibo.setPagadoAcumulado(recibo.getImporte());
             recibo.setEstado(EstadoRecibo.COBRADO);
             recibo.setFechaCobroBanco(movimiento.getFechaOperacion());
@@ -93,16 +100,51 @@ public class ConciliacionService {
     }
 
     /**
-     * NUEVA FUNCIONALIDAD: Conciliación en Cascada (Pagos Parciales/Excesivos).
-     * Toma el importe de un movimiento y lo reparte entre los recibos pendientes
-     * de un vecino, desde el más antiguo al más moderno.
+     * NUEVO MÉTODO GTI MAESTRO: Conciliación de Múltiples Movimientos Fragmentados por el Banco.
+     * Consolida una lista de apuntes bancarios y los aplica contra una lista de recibos elegidos.
+     */
+    @Transactional
+    public void vincularMultiplesMovimientosConVariosRecibos(List<Long> movimientoIds, List<Long> reciboIds) {
+        List<MovimientoBancario> movimientos = movRepository.findAllById(movimientoIds);
+        if (movimientos.isEmpty()) {
+            throw new RuntimeException("No se han localizado los movimientos bancarios seleccionados.");
+        }
+
+        // Establecemos la fecha oficial de cobro basada en la fecha del apunte más reciente del grupo
+        LocalDate fechaCobro = movimientos.stream()
+                .map(MovimientoBancario::getFechaOperacion)
+                .max(LocalDate::compareTo)
+                .orElse(LocalDate.now());
+
+        // El primer apunte actúa como nexo de auditoría principal en la ficha de los recibos
+        MovimientoBancario movPrincipal = movimientos.get(0);
+
+        for (Long reciboId : reciboIds) {
+            Recibo recibo = reciboRepository.findById(reciboId)
+                    .orElseThrow(() -> new RuntimeException("Recibo no encontrado ID: " + reciboId));
+
+            recibo.setPagadoAcumulado(recibo.getImporte());
+            recibo.setEstado(EstadoRecibo.COBRADO);
+            recibo.setFechaCobroBanco(fechaCobro);
+            recibo.setMovimientoBancario(movPrincipal);
+            reciboRepository.save(recibo);
+        }
+
+        // Marcamos de forma colectiva todos los movimientos bancarios elegidos como conciliados
+        for (MovimientoBancario mov : movimientos) {
+            mov.setConciliado(true);
+            movRepository.save(mov);
+        }
+    }
+
+    /**
+     * CONCILIACIÓN EN CASCADA (Pagos Parciales/Excesivos).
      */
     @Transactional
     public void conciliarEnCascada(Long movimientoId, Long vecinoId) {
         MovimientoBancario mov = movRepository.findById(movimientoId).orElseThrow();
         BigDecimal saldoRestante = mov.getImporte();
 
-        // Obtenemos recibos pendientes del vecino ordenados por fecha de emisión (los más viejos primero)
         List<Recibo> pendientes = reciboRepository.findAll().stream()
                 .filter(r -> r.getVecino().getId().equals(vecinoId) && r.getEstado() != EstadoRecibo.COBRADO)
                 .sorted(Comparator.comparing(Recibo::getFechaEmision))
@@ -114,22 +156,19 @@ public class ConciliacionService {
             BigDecimal deudaRecibo = r.getSaldoPendiente();
 
             if (saldoRestante.compareTo(deudaRecibo) >= 0) {
-                // El dinero cubre todo este recibo
                 saldoRestante = saldoRestante.subtract(deudaRecibo);
-                r.registrarPago(deudaRecibo); // Esto lo pone en COBRADO internamente
+                r.registrarPago(deudaRecibo);
                 r.setMovimientoBancario(mov);
                 r.setFechaCobroBanco(mov.getFechaOperacion());
             } else {
-                // El dinero solo cubre una parte del recibo
                 r.registrarPago(saldoRestante);
-                r.setMovimientoBancario(mov); // Vinculamos para auditoría aunque sea parcial
+                r.setMovimientoBancario(mov);
                 r.setFechaCobroBanco(mov.getFechaOperacion());
                 saldoRestante = BigDecimal.ZERO;
             }
             reciboRepository.save(r);
         }
 
-        // Si se ha usado todo o parte del movimiento, lo marcamos como conciliado
         mov.setConciliado(true);
         movRepository.save(mov);
 

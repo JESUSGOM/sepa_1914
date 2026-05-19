@@ -23,10 +23,15 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.security.core.Authentication;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 /**
  * Controlador GTI Turbo 2.2: Gestión de Tesorería y Remesas SEPA.
- * Optimizado para eliminar advertencias de campos no usados y errores de concurrencia.
  */
 @Controller
 @RequestMapping("/bancos")
@@ -45,8 +50,8 @@ public class BancosController {
     private final ConceptoCobroRepository conceptoRepo;
     private final CuentaContableRepository cuentaContableRepository;
     private final LicenseService licenseService;
+    private final UsuarioRepository usuarioRepository;
 
-    // Inyección optimizada: Se eliminan reciboRepository y gastoRepository por no ser utilizados.
     public BancosController(Norma43Service n43Service,
                             SepaService sepaService,
                             ComunidadRepository comunidadRepository,
@@ -57,7 +62,8 @@ public class BancosController {
                             ContabilidadService contabilidadService,
                             ConceptoCobroRepository conceptoRepo,
                             CuentaContableRepository cuentaContableRepository,
-                            LicenseService licenseService) {
+                            LicenseService licenseService,
+                            UsuarioRepository usuarioRepository) {
 
         this.n43Service = n43Service;
         this.sepaService = sepaService;
@@ -70,27 +76,129 @@ public class BancosController {
         this.conceptoRepo = conceptoRepo;
         this.cuentaContableRepository = cuentaContableRepository;
         this.licenseService = licenseService;
+        this.usuarioRepository = usuarioRepository;
     }
 
+    /**
+     * Listado de movimientos optimizado con Paginación, Ordenación de Columnas y Búsqueda por Importe en Servidor.
+     */
     @GetMapping("/movimientos/{comunidadId}")
-    public String listarMovimientos(@PathVariable Long comunidadId, Model model) {
-        log.info("Cargando movimientos bancarios para comunidad ID: {}", comunidadId);
+    public String listarMovimientos(
+            @PathVariable Long comunidadId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "25") int size,
+            @RequestParam(value = "sortField", defaultValue = "fechaOperacion") String sortField,
+            @RequestParam(value = "sortDir", defaultValue = "asc") String sortDir,
+            @RequestParam(value = "importe", required = false) String importeBusqueda,
+            Model model) {
+
+        log.info("Cargando movimientos bancarios para comunidad ID: {} | Pág: {} | Orden: {} {}", comunidadId, page, sortField, sortDir);
         Optional<Comunidad> comOpt = comunidadRepository.findById(comunidadId);
 
         if (comOpt.isPresent()) {
             Comunidad c = comOpt.get();
             model.addAttribute("comunidad", c);
-            List<MovimientoBancario> todos = movimientoRepository.findByComunidadIdOrderByFechaOperacionAsc(comunidadId);
-            List<MovimientoBancario> ejercicioActual = todos.stream()
-                    .filter(m -> m.getFechaOperacion() != null && m.getFechaOperacion().getYear() == 2026)
-                    .toList();
-            model.addAttribute("movimientos", ejercicioActual);
+
+            Sort sort = sortDir.equalsIgnoreCase("desc")
+                    ? Sort.by(sortField).descending().and(Sort.by("id").descending())
+                    : Sort.by(sortField).ascending().and(Sort.by("id").ascending());
+
+            Pageable pageable = PageRequest.of(page, size, sort);
+            Page<MovimientoBancario> paginaMovimientos;
+
+            if (importeBusqueda != null && !importeBusqueda.isBlank()) {
+                try {
+                    BigDecimal valor = new BigDecimal(importeBusqueda.replace(",", "."));
+                    paginaMovimientos = movimientoRepository.findByComunidadIdAndImporte(comunidadId, valor, pageable);
+                } catch (Exception e) {
+                    log.warn("Formato de importe de búsqueda no válido: {}", importeBusqueda);
+                    paginaMovimientos = movimientoRepository.findByComunidadId(comunidadId, pageable);
+                }
+            } else {
+                paginaMovimientos = movimientoRepository.findByComunidadId(comunidadId, pageable);
+            }
+
+            model.addAttribute("movimientos", paginaMovimientos.getContent());
+            model.addAttribute("pagina", paginaMovimientos);
+            model.addAttribute("currentPage", page);
+            model.addAttribute("totalPages", paginaMovimientos.getTotalPages());
+            model.addAttribute("totalItems", paginaMovimientos.getTotalElements());
+            model.addAttribute("importeBusqueda", importeBusqueda);
+
+            model.addAttribute("sortField", sortField);
+            model.addAttribute("sortDir", sortDir);
+            model.addAttribute("reverseSortDir", sortDir.equals("asc") ? "desc" : "asc");
+
             model.addAttribute("activePage", "extracto-banco");
             model.addAttribute("todasLasCuentas", cuentaContableRepository.findByComunidadId(comunidadId));
+
+            // NUEVO GTI: Pasamos los recibos pendientes para el Modal de Conciliación Colectiva
+            model.addAttribute("recibosPendientes", conciliacionService.obtenerRecibosPendientes(comunidadId));
         } else {
             log.error("No se encontró la comunidad {} para listar movimientos", comunidadId);
+            return "redirect:/comunidades/lista?error=finca_no_encontrada";
         }
         return "bancos-lista";
+    }
+
+    /**
+     * NUEVO ENDPOINT GTI: Procesa la conciliación manual de múltiples apuntes contra múltiples recibos.
+     * Resuelve de forma definitiva el abono fraccionado de remesas por parte de las entidades bancarias.
+     */
+    @PostMapping("/conciliar-multiples")
+    public String conciliarMultiplesMovimientos(
+            @RequestParam("movimientoIds") List<Long> movimientoIds,
+            @RequestParam(value = "reciboIds", required = false) List<Long> reciboIds,
+            RedirectAttributes ra) {
+
+        Long comunidadId = null;
+        try {
+            if (movimientoIds == null || movimientoIds.isEmpty()) {
+                throw new RuntimeException("Debe marcar al menos un apunte bancario mediante el casillero.");
+            }
+            if (reciboIds == null || reciboIds.isEmpty()) {
+                throw new RuntimeException("Debe seleccionar al menos un recibo pendiente para cruzar la operación.");
+            }
+
+            MovimientoBancario primerMov = movimientoRepository.findById(movimientoIds.get(0))
+                    .orElseThrow(() -> new RuntimeException("Movimiento no localizado."));
+            comunidadId = primerMov.getComunidad().getId();
+
+            conciliacionService.vincularMultiplesMovimientosConVariosRecibos(movimientoIds, reciboIds);
+            ra.addFlashAttribute("mensaje", "¡GTI ÉXITO! Sincronización completada. Se han conciliado los apuntes y liquidado los recibos.");
+
+        } catch (Exception e) {
+            log.error("Fallo en conciliación multi-abono: {}", e.getMessage());
+            ra.addFlashAttribute("error", "Error al conciliar bloque: " + e.getMessage());
+        }
+
+        return comunidadId != null ? "redirect:/bancos/movimientos/" + comunidadId : "redirect:/comunidades";
+    }
+
+    @PostMapping("/desconciliar/{id}")
+    public String desconciliarMovimientoUnitario(@PathVariable("id") Long id, RedirectAttributes ra) {
+        Long comunidadId = null;
+        try {
+            MovimientoBancario mov = movimientoRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Movimiento bancario no localizado."));
+
+            comunidadId = mov.getComunidad().getId();
+
+            // Cambiamos el estado técnico del movimiento
+            mov.setConciliado(false);
+            movimientoRepository.save(mov);
+
+            // Aquí puedes llamar a tu servicio contable si necesitas reabrir
+            // los recibos que estaban vinculados originalmente a este movimiento
+            // contabilidadService.deshacerAsientoCobroPorMovimiento(id);
+
+            ra.addFlashAttribute("mensaje", "¡GTI ÉXITO! Movimiento bancario liberado y desconciliado correctamente.");
+        } catch (Exception e) {
+            log.error("Fallo al desconciliar movimiento bancario: {}", e.getMessage());
+            ra.addFlashAttribute("error", "Error al revertir la conciliación: " + e.getMessage());
+        }
+
+        return comunidadId != null ? "redirect:/bancos/movimientos/" + comunidadId : "redirect:/comunidades/lista";
     }
 
     @PostMapping("/procesar-devolucion")
@@ -158,10 +266,6 @@ public class BancosController {
         }
     }
 
-    /**
-     * Descarga SEPA GTI Turbo 2.2: Se elimina @Transactional para permitir que los hilos
-     * paralelos del SepaService no colisionen con la sesión de Hibernate.
-     */
     @PostMapping("/descargar-remesa/{comunidadId}")
     public ResponseEntity<byte[]> descargarSepa(
             @PathVariable("comunidadId") Long comunidadId,
@@ -173,7 +277,7 @@ public class BancosController {
 
         if (!licenseService.validarLicencia()) {
             log.warn("Descarga bloqueada: Sin licencia válida.");
-            String htmlScript = "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\"><title>Sistema Bloqueado</title><style>body { font-family: sans-serif; background: #f8f9fa; display: flex; justify-content: center; align-items: center; height: 100vh; } .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #dc3545; } .hwid { background: #e9ecef; padding: 10px; font-weight: bold; color: #0056b3; margin: 20px 0; display: inline-block; }</style></head><body><div class=\"card\"><h2>SISTEMA BLOQUEADO</h2><p>Licencia no válida o pago pendiente.</p><div class=\"hwid\">" + licenseService.getEquipoID() + "</div><p>Contacte con soporte para activar su suscripción.</p><button onclick=\"window.history.back()\">Volver</button></div></body></html>";
+            String htmlScript = "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\"><title>Sistema Bloqueado</title></head><body><div style='text-align:center; margin-top:50px;'><h2>SISTEMA BLOQUEADO</h2><p>Contacte con soporte.</p></div></body></html>";
             return ResponseEntity.status(200).header("Content-Type", "text/html; charset=UTF-8").body(htmlScript.getBytes(StandardCharsets.UTF_8));
         }
 
@@ -181,42 +285,23 @@ public class BancosController {
             Comunidad comunidad = comunidadRepository.findById(comunidadId)
                     .orElseThrow(() -> new RuntimeException("Comunidad no encontrada."));
 
-            log.info("🧹 Limpieza y generación de devengos para periodo {}/{}", mes, anio);
             contabilidadService.limpiarContabilidadMesAntesDeRemesa(comunidadId, mes, anio);
             contabilidadService.generarRecibosMes(comunidadId, mes, anio);
 
-            // OPTIMIZACIÓN N+1: Carga masiva de vecinos con sus conceptos
             List<Vecino> vecinos = vecinoRepository.findAllByComunidadIdWithConceptos(comunidadId);
-
-            // Generación con motor paralelo
             String contenidoFichero = sepaService.generarCuaderno19(comunidad, vecinos, fechaCargo);
 
             byte[] data = contenidoFichero.getBytes(StandardCharsets.ISO_8859_1);
             String nombreFichero = "RMS-" + comunidad.getNombre().trim().replaceAll("\\s+", "_").toUpperCase() + "_" + mes + "_" + anio + ".c19";
 
-            rutaRepo.findAll().stream().findFirst().ifPresent(conf -> {
-                if (conf.getRutaC19() != null && !conf.getRutaC19().isBlank()) {
-                    try {
-                        java.nio.file.Path dirPath = java.nio.file.Paths.get(conf.getRutaC19());
-                        java.nio.file.Files.createDirectories(dirPath);
-                        java.nio.file.Files.write(dirPath.resolve(nombreFichero), data);
-                        log.info("Backup SEPA guardado en: {}", dirPath.resolve(nombreFichero));
-                    } catch (Exception e) {
-                        log.error("Fallo al escribir backup: {}", e.getMessage());
-                    }
-                }
-            });
-
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombreFichero + "\"")
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .contentLength(data.length)
                     .body(data);
 
         } catch (Exception e) {
             log.error("FALLO CRÍTICO en remesa SEPA {}: {}", comunidadId, e.getMessage());
-            return ResponseEntity.internalServerError().contentType(MediaType.TEXT_PLAIN)
-                    .body(("Error interno: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
+            return ResponseEntity.internalServerError().body(("Error interno: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -286,7 +371,6 @@ public class BancosController {
             model.addAttribute("movimientos", detectados);
             model.addAttribute("comunidad", comunidad);
             model.addAttribute("activePage", "bancos");
-            log.info("Carga temporal N43 finalizada: {} registros.", detectados.size());
         } catch (Exception e) {
             log.error("Error al leer Norma 43: {}", e.getMessage());
             model.addAttribute("error", "Error: " + e.getMessage());
@@ -318,10 +402,9 @@ public class BancosController {
                 }
             } catch (Exception e) {
                 errores++;
-                log.error("Error persistiendo movimiento: {}", e.getMessage());
+                log.error("Error persisting movimiento: {}", e.getMessage());
             }
         }
-        // Resolviendo advertencias de variables no usadas mediante log detallado
         log.info("Persistencia N43 finalizada. Guardados: {}, Duplicados: {}, Errores: {}", guardados, duplicados, errores);
         ra.addFlashAttribute("mensaje", "Proceso finalizado. " + guardados + " nuevos registros.");
         session.removeAttribute("movimientos_temporales");
@@ -331,7 +414,7 @@ public class BancosController {
     @GetMapping("/mi-id")
     @ResponseBody
     public String verMiId() {
-        return "<h1>Control de Licencia SEPA 1914</h1>El identificador único de este equipo es: <b style='color:blue'>" + com.sepa1914.adminservice.util.HardwareUtil.getFingerprint() + "</b><br><br>Envíe este código para activar su suscripción.";
+        return "<h1>Control de Licencia SEPA 1914</h1>ID: " + com.sepa1914.adminservice.util.HardwareUtil.getFingerprint();
     }
 
     @PostMapping("/eliminar-periodo")
@@ -342,8 +425,54 @@ public class BancosController {
             ra.addFlashAttribute("mensaje", "¡REINICIO COMPLETADO!");
         } catch (Exception e) {
             log.error("Error borrando periodo: {}", e.getMessage());
-            ra.addFlashAttribute("error", "Error técnico al borrar.");
+            ra.addFlashAttribute("error", "Error técnico.");
         }
         return "redirect:/comunidades/detalle/" + comunidadId;
+    }
+
+    @PostMapping("/confirmar-n43")
+    public String confirmarImportacionN43(@RequestParam Long comunidadId, HttpSession session, RedirectAttributes ra) {
+        @SuppressWarnings("unchecked")
+        List<MovimientoBancario> temporales = (List<MovimientoBancario>) session.getAttribute("movimientos_temporales");
+        Comunidad com = comunidadRepository.findById(comunidadId).orElse(null);
+
+        if (temporales == null || com == null) {
+            ra.addFlashAttribute("error", "Error de sesión.");
+            return "redirect:/comunidades/lista";
+        }
+
+        int guardados = 0;
+        for (MovimientoBancario m : temporales) {
+            m.setComunidad(com);
+            if (!movimientoRepository.existsByFechaOperacionAndImporteAndConcepto(m.getFechaOperacion(), m.getImporte(), m.getConcepto())) {
+                movimientoRepository.save(m);
+                guardados++;
+            }
+        }
+        session.removeAttribute("movimientos_temporales");
+        ra.addFlashAttribute("mensaje", "Importados: " + guardados);
+        return "redirect:/bancos/movimientos/" + comunidadId;
+    }
+
+    @PostMapping("/vaciar-extracto")
+    public String vaciarExtracto(@RequestParam Long comunidadId, RedirectAttributes ra, Authentication auth) {
+        Usuario actual = getUsuarioLogueado(auth);
+        Comunidad com = comunidadRepository.findById(comunidadId).orElse(null);
+
+        if (com != null && com.getAdministrador().getId().equals(actual.getId())) {
+            try {
+                contabilidadService.vaciarExtractoBancario(comunidadId);
+                ra.addFlashAttribute("mensaje", "Extracto vaciado correctamente.");
+            } catch (Exception e) {
+                ra.addFlashAttribute("error", "Error técnico.");
+            }
+        }
+        return "redirect:/bancos/movimientos/" + comunidadId;
+    }
+
+    private Usuario getUsuarioLogueado(Authentication auth) {
+        if (auth == null) return null;
+        return usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
 }

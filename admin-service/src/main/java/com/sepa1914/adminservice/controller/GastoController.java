@@ -83,21 +83,33 @@ public class GastoController {
                                RedirectAttributes ra) {
         try {
             log.info("Iniciando guardado de gasto para comunidad {}. Cuenta: {}", comunidadId, cuentaGastoId);
-            Comunidad comunidad = comunidadRepository.findById(comunidadId).orElseThrow();
+
+            Comunidad comunidad = comunidadRepository.findById(comunidadId)
+                    .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
             gasto.setComunidad(comunidad);
 
+            // Vinculación de la cuenta contable del grupo 6
             if (cuentaGastoId != null) {
-                CuentaContable cuenta = cuentaRepository.findById(cuentaGastoId).orElseThrow();
+                CuentaContable cuenta = cuentaRepository.findById(cuentaGastoId)
+                        .orElseThrow(() -> new RuntimeException("Cuenta contable no encontrada"));
                 gasto.setCuentaGasto(cuenta);
                 log.info("Cuenta vinculada: {}", cuenta.getCodigo());
             }
 
             if (gasto.getCuentaGasto() == null) {
                 ra.addFlashAttribute("error", "Debe seleccionar una cuenta contable.");
-                return "redirect:/contabilidad/gastos/nuevo/" + comunidadId;
+                return "redirect:/contabilidad/gastos/" + comunidadId;
             }
 
-            // GESTIÓN FÍSICA DEL ARCHIVO PDF
+            // ==========================================================
+            // EL PARACAÍDAS: Corrección del error SQL 'fecha_factura' cannot be null
+            // ==========================================================
+            if (gasto.getFecha() == null) {
+                log.warn("⚠️ ATENCIÓN: Se recibió un gasto sin fecha. Aplicando paracaídas GTI (Fecha actual).");
+                gasto.setFecha(LocalDate.now());
+            }
+
+            // GESTIÓN FÍSICA DEL ARCHIVO PDF (Factura digitalizada)
             if (archivo != null && !archivo.isEmpty()) {
                 Files.createDirectories(rootPath);
                 String nombreFichero = System.currentTimeMillis() + "_" + archivo.getOriginalFilename();
@@ -107,17 +119,21 @@ public class GastoController {
                 log.info("PDF Guardado exitosamente en: {}", destino);
             }
 
+            // GUARDADO EN BASE DE DATOS
             Gasto guardado = gastoRepository.save(gasto);
+            log.info("Entidad Gasto guardada con ID: {}", guardado.getId());
 
-            // CONTABILIZACIÓN AUTOMÁTICA
+            // CONTABILIZACIÓN AUTOMÁTICA (Devengo 6 -> 4)
+            // Nota: Asegúrate de que este método en el Service realice el asiento de devengo
             contabilidadService.registrarGastoContable(guardado);
-            log.info("Gasto contabilizado. Asiento generado.");
+            log.info("Gasto contabilizado correctamente. Asiento generado.");
 
             ra.addFlashAttribute("exito", "Factura registrada y contabilizada correctamente.");
             return "redirect:/contabilidad/gastos/" + comunidadId;
+
         } catch (Exception e) {
-            log.error("Error crítico en guardado: ", e);
-            ra.addFlashAttribute("error", "Error al procesar: " + e.getMessage());
+            log.error("❌ ERROR CRÍTICO en guardarGasto: ", e);
+            ra.addFlashAttribute("error", "Error al procesar el gasto: " + e.getMessage());
             return "redirect:/contabilidad/gastos/" + comunidadId;
         }
     }
@@ -199,5 +215,22 @@ public class GastoController {
         gastoRepository.delete(gasto);
         ra.addFlashAttribute("exito", "Factura eliminada.");
         return "redirect:/contabilidad/gastos/" + idCom;
+    }
+
+    @GetMapping("/deshacer-pago/{id}")
+    public String deshacerPago(@PathVariable Long id, RedirectAttributes ra) {
+        try {
+            Gasto g = gastoRepository.findById(id).orElseThrow();
+            Long comunidadId = g.getComunidad().getId();
+
+            // Llamamos al método que acabamos de crear en el Service
+            contabilidadService.deshacerPagoGasto(id);
+
+            ra.addFlashAttribute("exito", "Pago anulado correctamente.");
+            return "redirect:/contabilidad/gastos/" + comunidadId;
+        } catch (Exception e) {
+            ra.addFlashAttribute("error", "Error: " + e.getMessage());
+            return "redirect:/comunidades/lista";
+        }
     }
 }

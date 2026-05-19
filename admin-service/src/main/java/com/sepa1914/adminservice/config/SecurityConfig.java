@@ -2,66 +2,174 @@ package com.sepa1914.adminservice.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+
+import org.springframework.http.HttpStatus;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
+    /*
+     * =========================================================
+     * PASSWORD ENCODER
+     * =========================================================
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /*
+     * =========================================================
+     * AUTHENTICATION MANAGER
+     * =========================================================
+     */
+    @Bean
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config) throws Exception {
+
+        return config.getAuthenticationManager();
+    }
+
+    /*
+     * =========================================================
+     * SECURITY FILTER CHAIN
+     * =========================================================
+     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
         http
+
+                /*
+                 * =====================================================
+                 * CSRF
+                 * =====================================================
+                 */
+                .csrf(csrf -> csrf.disable())
+
+                /*
+                 * =====================================================
+                 * AUTHORIZATION
+                 * =====================================================
+                 */
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Recursos estáticos y librerías (Acceso público)
-                        .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**", "/favicon.ico").permitAll()
 
-                        // 2. Páginas de acceso público (Login y Registro)
-                        .requestMatchers("/login", "/registro").permitAll()
+                        /*
+                         * Recursos públicos
+                         */
+                        .requestMatchers(
+                                "/css/**",
+                                "/js/**",
+                                "/images/**",
+                                "/webjars/**",
+                                "/favicon.ico"
+                        ).permitAll()
 
-                        // 3. Rutas de gestión (Requieren estar logueado)
-                        // Incluye: lista, nuevo, guardar, eliminar, descargar-mandato, subir-mandato y ver-mandato-firmado
-                        .requestMatchers("/vecinos/**").authenticated()
-                        .requestMatchers("/comunidades/**").authenticated()
-                        .requestMatchers("/conceptos/**").authenticated()
+                        /*
+                         * Login y registro web
+                         */
+                        .requestMatchers(
+                                "/login",
+                                "/registro"
+                        ).permitAll()
 
-                        // 4. Cualquier otra petición (Dashboard, etc.) requiere autenticación
+                        /*
+                         * API REST pública
+                         */
+                        .requestMatchers(
+                                "/api/auth/**"
+                        ).permitAll()
+
+                        /*
+                         * Módulos protegidos
+                         */
+                        .requestMatchers(
+                                "/dashboard/**",
+                                "/vecinos/**",
+                                "/comunidades/**",
+                                "/conceptos/**",
+                                "/gastos/**",
+                                "/presupuestos/**",
+                                "/usuarios/**"
+                        ).authenticated()
+
+                        /*
+                         * Todo lo demás requiere login
+                         */
                         .anyRequest().authenticated()
                 )
 
+                /*
+                 * =====================================================
+                 * LOGIN WEB THYMELEAF
+                 * =====================================================
+                 */
                 .formLogin(form -> form
+
                         .loginPage("/login")
+
                         .loginProcessingUrl("/login")
+
                         .defaultSuccessUrl("/dashboard", true)
+
                         .failureUrl("/login?error=true")
+
                         .permitAll()
                 )
 
+                /*
+                 * =====================================================
+                 * LOGOUT
+                 * =====================================================
+                 */
                 .logout(logout -> logout
-                        .logoutRequestMatcher(new AntPathRequestMatcher("/logout"))
+
+                        .logoutUrl("/logout")
+
                         .logoutSuccessUrl("/login?logout")
+
                         .invalidateHttpSession(true)
+
                         .deleteCookies("JSESSIONID")
+
                         .permitAll()
                 )
 
-                // Deshabilitamos CSRF para facilitar la gestión de remesas y subida de archivos multipart
-                .csrf(csrf -> csrf.disable())
+                /*
+                 * =====================================================
+                 * API REST
+                 * EVITA REDIRECCIÓN HTML EN APIs
+                 * =====================================================
+                 */
+                .exceptionHandling(ex -> ex
+                        .defaultAuthenticationEntryPointFor(
+                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                                request -> request.getRequestURI().startsWith("/api/")
+                        )
+                )
 
-                // Cabeceras de seguridad
+                /*
+                 * =====================================================
+                 * HEADERS
+                 * =====================================================
+                 */
                 .headers(headers -> headers
-                        // IMPORTANTE: Permitir que se abran los PDFs en marcos/objetos si fuera necesario
+
                         .frameOptions(frame -> frame.sameOrigin())
-                        // Opcional: Deshabilitar caché para las descargas de mandatos si fuera necesario
+
                         .cacheControl(cache -> cache.disable())
                 );
 

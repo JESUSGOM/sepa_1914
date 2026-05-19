@@ -3,6 +3,12 @@ package com.sepa1914.adminservice.model;
 import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.FetchType;
 
 /**
  * Entidad Usuario.
@@ -27,6 +33,13 @@ public class Usuario {
     //mappedBy apunta al campo 'administrador' en la clase Comunidad.
     @OneToMany(mappedBy = "administrador", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Comunidad> comunidades = new ArrayList<>();
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "usuario_roles",
+            joinColumns = @JoinColumn(name = "usuario_id"),
+            inverseJoinColumns = @JoinColumn(name = "rol_id")
+    )
+    private Set<Rol> roles = new HashSet<>();
 
     public Usuario() {}
 
@@ -63,4 +76,7 @@ public class Usuario {
     public void setComunidades(List<Comunidad> comunidades) {
         this.comunidades = comunidades;
     }
+
+    public Set<Rol> getRoles() {return roles;}
+    public void setRoles(Set<Rol> roles) {this.roles = roles;}
 }

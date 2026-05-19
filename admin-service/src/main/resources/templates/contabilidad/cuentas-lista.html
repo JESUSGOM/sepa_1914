@@ -13,7 +13,7 @@
                 <ol class="breadcrumb mb-0 small">
                     <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
                     <li class="breadcrumb-item"><a th:href="@{/comunidades/detalle/{id}(id=${comunidad.id})}" th:text="${comunidad.nombre}">Comunidad</a></li>
-                    <li class="breadcrumb-item active">Libro Mayor</li>
+                    <li class="breadcrumb-item active">Plan de Cuentas</li>
                 </ol>
             </nav>
 
@@ -24,24 +24,72 @@
                 </div>
             </div>
 
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
-                <div th:each="cta : ${cuentas}" class="col">
-                    <div class="card h-100 border-0 shadow-sm card-hover transition">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between mb-2">
-                                <code class="fw-bold text-primary fs-5" th:text="${cta.codigo}">572000</code>
-                                <span class="badge rounded-pill"
-                                      th:classappend="${cta.tipo.name() == 'ACTIVO' ? 'bg-success-subtle text-success border border-success' :
-                                                       cta.tipo.name() == 'PASIVO' ? 'bg-danger-subtle text-danger border border-danger' : 'bg-light text-dark border'}"
-                                      th:text="${cta.tipo}">TIPO</span>
-                            </div>
-                            <h6 class="card-title text-dark fw-bold mb-3 text-truncate-2" th:text="${cta.nombre}">Nombre</h6>
-                        </div>
-                        <div class="card-footer bg-transparent border-0 pb-3">
-                            <a th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cta.id})}" class="btn btn-sm btn-primary w-100 shadow-sm">
-                                <i class="bi bi-journal-text me-1"></i> Ver Libro Mayor
-                            </a>
-                        </div>
+            <form th:action="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id})}" method="get" class="row g-2 mb-4">
+                <input type="hidden" name="page" value="0">
+                <input type="hidden" name="sortField" th:value="${sortField}">
+                <input type="hidden" name="sortDir" th:value="${sortDir}">
+
+                <div class="col-md-5 col-lg-4">
+                    <div class="input-group input-group-sm shadow-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" name="buscar" th:value="${searchTerm}" class="form-control" placeholder="Buscar por código o descripción...">
+                        <button type="submit" class="btn btn-primary fw-bold">Buscar</button>
+                        <a th:if="${searchTerm != null && !searchTerm.isEmpty()}"
+                           th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id})}"
+                           class="btn btn-outline-secondary"><i class="bi bi-x-circle"></i></a>
+                    </div>
+                </div>
+            </form>
+
+            <div th:if="${totalItems > 0}" class="card shadow-sm border-0 mb-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-dark">
+                            <tr>
+                                <th class="ps-4" style="width: 15%;">
+                                    <a th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${currentPage}, buscar=${searchTerm}, sortField='codigo', sortDir=${reverseSortDir})}" class="text-white text-decoration-none d-flex align-items-center gap-1">
+                                        Código
+                                        <i class="bi" th:classappend="${sortField == 'codigo'} ? (${sortDir == 'asc'} ? 'bi-arrow-up-short' : 'bi-arrow-down-short') : 'bi-arrow-down-up small opacity-50'"></i>
+                                    </a>
+                                </th>
+                                <th style="width: 55%;">
+                                    <a th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${currentPage}, buscar=${searchTerm}, sortField='nombre', sortDir=${reverseSortDir})}" class="text-white text-decoration-none d-flex align-items-center gap-1">
+                                        Descripción de la Cuenta
+                                        <i class="bi" th:classappend="${sortField == 'nombre'} ? (${sortDir == 'asc'} ? 'bi-arrow-up-short' : 'bi-arrow-down-short') : 'bi-arrow-down-up small opacity-50'"></i>
+                                    </a>
+                                </th>
+                                <th class="text-center" style="width: 15%;">
+                                    <a th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${currentPage}, buscar=${searchTerm}, sortField='tipo', sortDir=${reverseSortDir})}" class="text-white text-decoration-none d-flex align-items-center gap-1 justify-content-center">
+                                        Tipo
+                                        <i class="bi" th:classappend="${sortField == 'tipo'} ? (${sortDir == 'asc'} ? 'bi-arrow-up-short' : 'bi-arrow-down-short') : 'bi-arrow-down-up small opacity-50'"></i>
+                                    </a>
+                                </th>
+                                <th class="text-center pe-4" style="width: 15%;">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="cta : ${cuentas}">
+                                <td class="ps-4 font-monospace fw-bold text-primary fs-6" th:text="${cta.codigo}">57200001</td>
+                                <td>
+                                    <div class="fw-bold text-dark" th:text="${cta.nombre}">Nombre de la cuenta</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge rounded-pill px-3 py-1.5 small font-monospace fw-bold"
+                                          th:classappend="${cta.tipo.name() == 'ACTIVO' ? 'bg-success-subtle text-success border border-success-subtle' :
+                                                           cta.tipo.name() == 'PASIVO' ? 'bg-danger-subtle text-danger border border-danger-subtle' :
+                                                           cta.tipo.name() == 'GASTO' ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' :
+                                                           cta.tipo.name() == 'INGRESO' ? 'bg-info-subtle text-info-emphasis border border-info-subtle' : 'bg-light text-dark border'}"
+                                          th:text="${cta.tipo}">TIPO</span>
+                                </td>
+                                <td class="text-center pe-4">
+                                    <a th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cta.id})}" class="btn btn-sm btn-outline-primary shadow-sm px-3">
+                                        <i class="bi bi-journal-text me-1"></i> Ver Mayor
+                                    </a>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -49,34 +97,36 @@
             <nav th:if="${totalPages > 1}" aria-label="Navegación de cuentas">
                 <ul class="pagination pagination-sm justify-content-center">
                     <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
-                        <a class="page-link" th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${currentPage - 1})}">Anterior</a>
+                        <a class="page-link" th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${currentPage - 1}, buscar=${searchTerm}, sortField=${sortField}, sortDir=${sortDir})}">Anterior</a>
                     </li>
 
                     <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}"
                         th:classappend="${currentPage == i ? 'active' : ''}">
-                        <a class="page-link" th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${i})}" th:text="${i + 1}">1</a>
+                        <a class="page-link" th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${i}, buscar=${searchTerm}, sortField=${sortField}, sortDir=${sortDir})}" th:text="${i + 1}">1</a>
                     </li>
 
                     <li class="page-item" th:classappend="${currentPage == totalPages - 1 ? 'disabled' : ''}">
-                        <a class="page-link" th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${currentPage + 1})}">Siguiente</a>
+                        <a class="page-link" th:href="@{/contabilidad/cuentas/lista/{id}(id=${comunidad.id}, page=${currentPage + 1}, buscar=${searchTerm}, sortField=${sortField}, sortDir=${sortDir})}">Siguiente</a>
                     </li>
                 </ul>
             </nav>
 
             <div th:if="${totalItems == 0}" class="text-center py-5">
                 <i class="bi bi-folder-x display-1 text-muted"></i>
-                <p class="h5 mt-3 text-muted">No hay cuentas contables en esta comunidad.</p>
+                <p class="h5 mt-3 text-muted">No se encontraron cuentas contables que coincidan con la búsqueda.</p>
             </div>
         </main>
     </div>
 </div>
 
 <style>
-    .card-hover:hover { transform: translateY(-5px); box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.1)!important; }
-    .transition { transition: all 0.3s ease; }
-    .text-truncate-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 3rem; }
     .pagination .page-link { border-radius: 5px; margin: 0 2px; border: none; color: #444; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     .pagination .page-item.active .page-link { background-color: #0d6efd; color: white; }
+    .table tbody tr:hover { background-color: rgba(0,0,0,.015) !important; }
+    .bg-success-subtle { background-color: #d1e7dd !important; }
+    .bg-danger-subtle { background-color: #f8d7da !important; }
+    .bg-warning-subtle { background-color: #fff3cd !important; }
+    .bg-info-subtle { background-color: #cff4fc !important; }
 </style>
 </body>
 </html>

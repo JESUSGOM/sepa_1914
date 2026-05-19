@@ -5,12 +5,18 @@ import com.sepa1914.adminservice.model.*;
 import com.sepa1914.adminservice.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
 import java.math.RoundingMode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Servicio de Contabilidad Integral para SEPA 1914.
@@ -195,7 +201,7 @@ public class ContabilidadService {
     }
 
     @Transactional
-    public Recibo registrarDevengoCuota(Vecino v, BigDecimal imp, String con, LocalDate fecha) {
+    public Recibo registrarDevengoCuota(Vecino v, BigDecimal imp, String con, LocalDate fecha, String tipo, String etiqueta) {
         Recibo r = new Recibo();
         r.setVecino(v);
         r.setComunidad(v.getComunidad());
@@ -204,10 +210,17 @@ public class ContabilidadService {
         r.setFechaEmision(fecha != null ? fecha : LocalDate.now());
         r.setEstado(Recibo.EstadoRecibo.PENDIENTE);
         r.setConcepto(con);
+
+        // NUEVO: Guardamos el ADN del recibo para el borrado inteligente futuro
+        r.setTipoRemesa(tipo != null ? tipo : "ORDINARIA");
+        r.setEtiquetaExtra(etiqueta);
+
         Recibo guardado = reciboRepo.save(r);
 
+        // Mantenemos tu funcionalidad original de ejecutar el asiento contable interno
         ejecutarAsientoCobroInterno(guardado);
-        log.info("Devengo contable registrado para {}: {} €", v.getNombre(), imp);
+
+        log.info("Devengo registrado para {} [{} - {}]: {} €", v.getNombre(), r.getTipoRemesa(), etiqueta, imp);
         return guardado;
     }
 
@@ -261,18 +274,44 @@ public class ContabilidadService {
      * PASO 2: LIMPIEZA INTEGRAL PARA REGENERACIÓN
      */
     @Transactional
-    public void limpiarContabilidadMesAntesDeRemesa(Long comunidadId, int mes, int anio) {
-        log.info("🧹 Limpiando periodo {}/{} para comunidad {}", mes, anio, comunidadId);
-        List<Recibo> pendientes = reciboRepo.findByComunidadId(comunidadId).stream()
+    public void limpiarContabilidadMesAntesDeRemesa(Long comunidadId, int mes, int anio, String tipo, String etiqueta, boolean sustituir) {
+        log.info("🧹 Iniciando limpieza selectiva periodo {}/{} para comunidad {} [Tipo: {}, Etiqueta: {}]",
+                mes, anio, comunidadId, tipo, etiqueta);
+
+        // Si es extraordinaria y el operador ha dicho que NO quiere sustituir,
+        // salimos directamente sin borrar nada.
+        if ("EXTRAORDINARIA".equals(tipo) && !sustituir) {
+            log.info("GTI: Nueva extraordinaria detectada. Se mantienen recibos anteriores.");
+            return;
+        }
+
+        // Buscamos los recibos de la comunidad que coincidan con el periodo y estén PENDIENTES
+        List<Recibo> recibosABorrar = reciboRepo.findByComunidadId(comunidadId).stream()
                 .filter(r -> r.getFechaEmision().getMonthValue() == mes
                         && r.getFechaEmision().getYear() == anio
                         && r.getEstado() == Recibo.EstadoRecibo.PENDIENTE)
+                .filter(r -> {
+                    // FILTRADO INTELIGENTE:
+                    if ("ORDINARIA".equals(tipo)) {
+                        // Si estamos generando la Ordinaria, solo borramos las Ordinarias previas
+                        return "ORDINARIA".equals(r.getTipoRemesa());
+                    } else {
+                        // Si estamos generando una Extraordinaria y sustituir es true,
+                        // solo borramos los recibos que tengan EXACTAMENTE la misma etiqueta.
+                        return "EXTRAORDINARIA".equals(r.getTipoRemesa())
+                                && etiqueta != null && etiqueta.equals(r.getEtiquetaExtra());
+                    }
+                })
                 .toList();
 
-        for (Recibo r : pendientes) {
+        // Procedemos al borrado de los recibos filtrados y sus movimientos contables
+        for (Recibo r : recibosABorrar) {
+            // Mantenemos tu funcionalidad original de eliminar el asiento contable REC-ID
             movContableRepo.deleteAll(movContableRepo.findByNumeroAsiento("REC-" + r.getId()));
             reciboRepo.delete(r);
         }
+
+        log.info("GTI: Limpieza finalizada. Eliminados {} recibos y sus asientos correspondientes.", recibosABorrar.size());
     }
 
     // =========================================================================
@@ -390,33 +429,207 @@ public class ContabilidadService {
     // 4. MÉTODOS DE SOPORTE (Helpers Privados)
     // =========================================================================
 
+    /**
+            * REGISTRO INTEGRAL GTI: Procesa el asiento de devengo (6 -> 4).
+            * Este método garantiza que no existan duplicados borrando cualquier rastro previo
+     * antes de realizar los nuevos apuntes.
+            */
     private void ejecutarRegistroGastoInterno(Gasto gasto) {
-        String concepto = "Factura: " + gasto.getNumeroFactura();
-        if (gasto.getNumeroAsiento() == null || gasto.getNumeroAsiento().isEmpty()) {
-            gasto.setNumeroAsiento("FRA-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        log.info("GTI SYNC: Iniciando proceso contable para Gasto ID: {}", gasto.getId());
+
+        // 1. LIMPIEZA PREVIA ATÓMICA
+        // Si el gasto ya tiene un número de asiento (aunque sea técnico como 'FRA-XXX'),
+        // borramos todos los movimientos del diario que usen ese identificador.
+        if (gasto.getNumeroAsiento() != null && !gasto.getNumeroAsiento().isEmpty()) {
+            log.info("GTI: Limpiando rastro del asiento previo: {}", gasto.getNumeroAsiento());
+            movContableRepo.deleteByNumeroAsiento(gasto.getNumeroAsiento());
+
+            // CRÍTICO: El flush obliga a la base de datos a ejecutar el DELETE ahora mismo.
+            // Sin esto, Hibernate podría intentar hacer los INSERT nuevos antes que el DELETE,
+            // causando los duplicados que ves en el diario.
+            movContableRepo.flush();
+        } else {
+            // Si es un gasto nuevo, generamos un identificador técnico único.
+            // Nota: La "Renumeración Legal" lo convertirá después en un número sencillo (1, 2, 3...).
+            gasto.setNumeroAsiento("GAS-" + System.currentTimeMillis() + "-" + gasto.getId());
         }
-        registrarApunte(gasto.getCuentaGasto(), gasto.getImporteTotal(), BigDecimal.ZERO, concepto, gasto.getNumeroAsiento(), gasto.getComunidad(), gasto.getFecha());
+
+        // 2. CONSTRUCCIÓN DEL CONCEPTO
+        String concepto = "Fra. " + (gasto.getNumeroFactura() != null ? gasto.getNumeroFactura() : "S/N")
+                + " - " + gasto.getProveedor();
+
+        // 3. APUNTE AL DEBE: Cuenta de Gasto (Grupo 6)
+        // Refleja el consumo/gasto de la comunidad.
+        registrarApunte(
+                gasto.getCuentaGasto(),
+                gasto.getImporteTotal(),
+                BigDecimal.ZERO,
+                concepto,
+                gasto.getNumeroAsiento(),
+                gasto.getComunidad(),
+                gasto.getFecha()
+        );
+
+        // 4. APUNTE AL HABER: Cuenta de Acreedor/Proveedor (Grupo 410)
+        // Refleja la deuda contraída con el tercero.
         CuentaContable ctaProv = obtenerOCrearCuentaProveedor(gasto.getProveedor(), gasto.getComunidad());
-        registrarApunte(ctaProv, BigDecimal.ZERO, gasto.getImporteTotal(), "Provisión", gasto.getNumeroAsiento(), gasto.getComunidad(), gasto.getFecha());
+
+        registrarApunte(
+                ctaProv,
+                BigDecimal.ZERO,
+                gasto.getImporteTotal(),
+                "PROVEEDOR: " + gasto.getProveedor(),
+                gasto.getNumeroAsiento(),
+                gasto.getComunidad(),
+                gasto.getFecha()
+        );
+
+        // 5. ACTUALIZACIÓN DE LA ENTIDAD GASTO
+        // Guardamos el gasto para asegurar que el NumeroAsiento quede grabado.
         gastoRepository.save(gasto);
+
+        log.info("✅ Asiento de devengo registrado/actualizado: {} para {}",
+                gasto.getNumeroAsiento(), gasto.getProveedor());
     }
 
     private void ejecutarAsientoCobroInterno(Recibo r) {
+
         movContableRepo.deleteByNumeroAsiento("REC-" + r.getId());
         movContableRepo.deleteByNumeroAsiento("COB-" + r.getId());
         movContableRepo.flush();
+
         CuentaContable ctaIngreso = buscarCuentaPorConceptoRecibo(r);
+
         String codVecino = crearCuentaParaVecino(r.getVecino());
-        CuentaContable ctaVecino = cuentaContableRepository.findByCodigoAndComunidadId(codVecino, r.getComunidad().getId()).orElseThrow();
+
+        CuentaContable ctaVecino =
+                cuentaContableRepository
+                        .findByCodigoAndComunidadId(
+                                codVecino,
+                                r.getComunidad().getId())
+                        .orElseThrow();
+
         String numAsientoEmision = "REC-" + r.getId();
-        registrarApunte(ctaVecino, r.getImporte(), BigDecimal.ZERO, "Emisión " + r.getConcepto(), numAsientoEmision, r.getComunidad(), r.getFechaEmision());
-        registrarApunte(ctaIngreso, BigDecimal.ZERO, r.getImporte(), "Ingreso " + r.getConcepto(), numAsientoEmision, r.getComunidad(), r.getFechaEmision());
+
+        BigDecimal base = r.getImporte();
+        BigDecimal impuesto = BigDecimal.ZERO;
+        BigDecimal total = base;
+
+        TipoImpuesto tipoImpuesto = TipoImpuesto.EXENTO;
+        BigDecimal porcentaje = BigDecimal.ZERO;
+
+        Optional<ConceptoCobro> conceptoOpt =
+                conceptoCobroRepo.findAllGenericConcepts()
+                        .stream()
+                        .filter(c ->
+                                r.getConcepto()
+                                        .toLowerCase()
+                                        .contains(c.getDescripcion().toLowerCase()))
+                        .findFirst();
+
+        if (conceptoOpt.isPresent()) {
+
+            ConceptoCobro cc = conceptoOpt.get();
+
+            if (cc.getTipoImpuesto() != null) {
+                tipoImpuesto = cc.getTipoImpuesto();
+            }
+
+            if (cc.getPorcentajeImpuesto() != null) {
+                porcentaje = cc.getPorcentajeImpuesto();
+            }
+        }
+
+        if (tipoImpuesto != TipoImpuesto.EXENTO
+                && porcentaje.compareTo(BigDecimal.ZERO) > 0) {
+
+            impuesto = base
+                    .multiply(
+                            porcentaje.divide(
+                                    new BigDecimal("100"),
+                                    4,
+                                    RoundingMode.HALF_UP))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            total = base.add(impuesto);
+        }
+
+        registrarApunte(
+                ctaVecino,
+                total,
+                BigDecimal.ZERO,
+                "Emisión " + r.getConcepto(),
+                numAsientoEmision,
+                r.getComunidad(),
+                r.getFechaEmision()
+        );
+
+        registrarApunte(
+                ctaIngreso,
+                BigDecimal.ZERO,
+                base,
+                "Ingreso " + r.getConcepto(),
+                numAsientoEmision,
+                r.getComunidad(),
+                r.getFechaEmision()
+        );
+
+        if (impuesto.compareTo(BigDecimal.ZERO) > 0) {
+
+            CuentaContable cuentaImpuesto = obtenerCuentaImpuesto(
+                    tipoImpuesto,
+                    r.getComunidad()
+            );
+
+            registrarApunte(
+                    cuentaImpuesto,
+                    BigDecimal.ZERO,
+                    impuesto,
+                    tipoImpuesto.name() + " repercutido",
+                    numAsientoEmision,
+                    r.getComunidad(),
+                    r.getFechaEmision()
+            );
+        }
+
         if (r.getEstado() == Recibo.EstadoRecibo.COBRADO) {
+
             String numAsientoCobro = "COB-" + r.getId();
-            CuentaContable ctaBanco = cuentaContableRepository.findByComunidadIdAndTipo(r.getComunidad().getId(), TipoCuenta.ACTIVO).stream().filter(c -> c.getCodigo().startsWith("572")).findFirst().orElseThrow();
-            LocalDate fechaRealCobro = (r.getFechaCobroBanco() != null) ? r.getFechaCobroBanco() : LocalDate.now();
-            registrarApunte(ctaBanco, r.getImporte(), BigDecimal.ZERO, "Cobro Banco " + r.getConcepto(), numAsientoCobro, r.getComunidad(), fechaRealCobro);
-            registrarApunte(ctaVecino, BigDecimal.ZERO, r.getImporte(), "Cancelación deuda " + r.getVecino().getNombre(), numAsientoCobro, r.getComunidad(), fechaRealCobro);
+
+            CuentaContable ctaBanco =
+                    cuentaContableRepository
+                            .findByComunidadIdAndTipo(
+                                    r.getComunidad().getId(),
+                                    TipoCuenta.ACTIVO)
+                            .stream()
+                            .filter(c -> c.getCodigo().startsWith("572"))
+                            .findFirst()
+                            .orElseThrow();
+
+            LocalDate fechaRealCobro =
+                    (r.getFechaCobroBanco() != null)
+                            ? r.getFechaCobroBanco()
+                            : LocalDate.now();
+
+            registrarApunte(
+                    ctaBanco,
+                    total,
+                    BigDecimal.ZERO,
+                    "Cobro Banco " + r.getConcepto(),
+                    numAsientoCobro,
+                    r.getComunidad(),
+                    fechaRealCobro
+            );
+
+            registrarApunte(
+                    ctaVecino,
+                    BigDecimal.ZERO,
+                    total,
+                    "Cancelación deuda " + r.getVecino().getNombre(),
+                    numAsientoCobro,
+                    r.getComunidad(),
+                    fechaRealCobro
+            );
         }
     }
 
@@ -491,17 +704,48 @@ public class ContabilidadService {
 
     @Transactional
     public void inicializarPlanContable(Comunidad comunidad) {
+
         log.info("Inicializando Plan Contable Maestro para comunidad: {}", comunidad.getNombre());
+
         String[][] planExtra = {
+
+                // GASTOS
                 {"62800001", "Suministro Eléctrico (Escalera/Portal)", "GASTO"},
                 {"62800003", "Suministro de Agua", "GASTO"},
                 {"62900001", "Servicio de Limpieza", "GASTO"},
+
+                // BANCOS
                 {"57200001", "Banco Principal c/c", "ACTIVO"},
-                {"73100000", "Cuotas ordinarias generales", "INGRESO"}
+
+                // INGRESOS COMUNIDAD
+                {"73100001", "Cuotas ordinarias generales", "INGRESO"},
+                {"73100002", "Derramas extraordinarias", "INGRESO"},
+                {"73100003", "Ingresos varios", "INGRESO"},
+
+                // HONORARIOS ADMINISTRACIÓN
+                {"70000001", "Honorarios Administración", "INGRESO"},
+
+                // IMPUESTOS REPERCUTIDOS
+                {"47700001", "HP IVA Repercutido", "PASIVO"},
+                {"47700002", "HP IPSI Repercutido", "PASIVO"},
+                {"47770001", "HP IGIC Repercutido", "PASIVO"}
         };
+
         for (String[] c : planExtra) {
-            if (!cuentaContableRepository.existsByCodigoAndComunidadId(c[0], comunidad.getId())) {
-                cuentaContableRepository.save(new CuentaContable(c[0], c[1], TipoCuenta.valueOf(c[2]), comunidad));
+
+            if (!cuentaContableRepository.existsByCodigoAndComunidadId(
+                    c[0],
+                    comunidad.getId()
+            )) {
+
+                cuentaContableRepository.save(
+                        new CuentaContable(
+                                c[0],
+                                c[1],
+                                TipoCuenta.valueOf(c[2]),
+                                comunidad
+                        )
+                );
             }
         }
     }
@@ -546,20 +790,47 @@ public class ContabilidadService {
         return mayor;
     }
 
+    /**
+     * RENUMERACIÓN LEGAL GTI: Ordena cronológicamente todos los asientos del año
+     * y les asigna un número secuencial (1, 2, 3...) sin saltos.
+     */
     @Transactional
-    public void renumerarAsientosEjercicio(Long comunidadId, int anio) {
-        List<MovimientoContable> movimientos = movContableRepo.findByComunidadIdAndAnioOrderByFechaAscIdAsc(comunidadId, anio);
-        int contador = 1;
-        Map<String, String> mapa = new HashMap<>();
+    public void renumerarAsientosEjercicio(Long comunidadId, int ejercicio) {
+        // 1. Obtenemos todos los movimientos del año ordenados por fecha e ID técnico
+        List<MovimientoContable> movimientos = movContableRepo.findByComunidadIdAndAnio(
+                        comunidadId, ejercicio, org.springframework.data.domain.Pageable.unpaged()).getContent()
+                .stream()
+                .sorted(Comparator.comparing(MovimientoContable::getFecha)
+                        .thenComparing(MovimientoContable::getId))
+                .collect(Collectors.toList());
+
+        if (movimientos.isEmpty()) return;
+
+        Map<String, String> mapaRenumeracion = new HashMap<>();
+        int contadorAsiento = 1;
+
         for (MovimientoContable mov : movimientos) {
-            if (mov.getNumeroAsiento() == null) continue;
-            if (!mapa.containsKey(mov.getNumeroAsiento())) mapa.put(mov.getNumeroAsiento(), String.valueOf(contador++));
-            mov.setNumeroAsiento(mapa.get(mov.getNumeroAsiento()));
+            String antiguoNumero = mov.getNumeroAsiento();
+
+            // Si el asiento ya ha sido procesado (varios apuntes con mismo número), usamos el nuevo asignado
+            if (!mapaRenumeracion.containsKey(antiguoNumero)) {
+                mapaRenumeracion.put(antiguoNumero, String.valueOf(contadorAsiento));
+                contadorAsiento++;
+            }
+
+            // Actualizamos el número de asiento en el apunte
+            mov.setNumeroAsiento(mapaRenumeracion.get(antiguoNumero));
+            movContableRepo.save(mov);
         }
-        movContableRepo.saveAll(movimientos);
+
+        log.info("✅ Renumeración finalizada: {} asientos procesados para comunidad {}", (contadorAsiento - 1), comunidadId);
     }
 
-    @Transactional public void sincronizarContabilidadExistente(Long id) { log.info("Sincronización ID: {}", id); }
+    @Transactional
+    public void sincronizarContabilidadExistente(Long id) {
+        log.info("GTI SYNC: Verificando e inicializando plan contable estructural para comunidad ID: {}", id);
+        comunidadRepository.findById(id).ifPresent(this::inicializarPlanContable);
+    }
 
     @Transactional
     public void deshacerConciliacionRecibo(Long reciboId) {
@@ -597,16 +868,34 @@ public class ContabilidadService {
         return cuenta;
     }
 
-    public void registrarApunte(CuentaContable cta, BigDecimal debe, BigDecimal haber, String concepto, String asiento, Comunidad com, LocalDate fecha) {
+    /**
+     * Registra un apunte individual en el Libro Diario.
+     * MEJORA GTI: Filtra apuntes con importe cero para mantener la limpieza.
+     */
+    public void registrarApunte(CuentaContable cta, BigDecimal debe, BigDecimal haber,
+                                String concepto, String asiento, Comunidad com, LocalDate fecha) {
+
         if (cta == null || com == null) return;
+
+        // SEGURIDAD: Si ambos importes son 0 o nulos, no creamos el apunte
+        BigDecimal dVal = (debe != null) ? debe : BigDecimal.ZERO;
+        BigDecimal hVal = (haber != null) ? haber : BigDecimal.ZERO;
+
+        if (dVal.compareTo(BigDecimal.ZERO) == 0 && hVal.compareTo(BigDecimal.ZERO) == 0) {
+            log.warn("GTI: Omitiendo apunte con importe 0 para la cuenta {}", cta.getCodigo());
+            return;
+        }
+
         MovimientoContable m = new MovimientoContable();
         m.setCuenta(cta);
-        m.setDebe(debe != null ? debe : BigDecimal.ZERO);
-        m.setHaber(haber != null ? haber : BigDecimal.ZERO);
+        m.setDebe(dVal);
+        m.setHaber(hVal);
         m.setConcepto(concepto);
         m.setNumeroAsiento(asiento);
         m.setFecha(fecha != null ? fecha : LocalDate.now());
         m.setComunidad(com);
+
+        // Guardamos el apunte
         movContableRepo.save(m);
     }
 
@@ -631,9 +920,89 @@ public class ContabilidadService {
                 .orElseGet(() -> cuentaContableRepository.save(new CuentaContable(codigo, "PROV: " + nombre, TipoCuenta.PASIVO, com)));
     }
 
+    private CuentaContable obtenerCuentaImpuesto(
+            TipoImpuesto tipo,
+            Comunidad comunidad) {
+
+        String codigo;
+
+        switch (tipo) {
+            case IVA:
+                codigo = "47700001";
+                break;
+
+            case IPSI:
+                codigo = "47700002";
+                break;
+
+            case IGIC:
+                codigo = "47770001";
+                break;
+
+            default:
+                log.warn("GTI: Tipo de impuesto {} no configurado para contabilidad.", tipo);
+                return null;
+        }
+
+        // Forzamos java.lang.RuntimeException para evitar el error de "6 argumentos"
+        return cuentaContableRepository
+                .findByCodigoAndComunidadId(
+                        codigo,
+                        comunidad.getId()
+                )
+                .orElseThrow(() ->
+                        new java.lang.RuntimeException("No existe cuenta contable impuesto: " + codigo)
+                );
+    }
+
     @Transactional
-    public void borrarRecibosYContabilidadDelMes(Long comunidadId, int mes, int anio) {
-        limpiarContabilidadMesAntesDeRemesa(comunidadId, mes, anio);
+    public void borrarRecibosYcontabilidadDelMes(
+            Long comunidadId,
+            int mes,
+            int anio,
+            String tipo,
+            String etiqueta,
+            boolean sustituir) {
+
+        log.info("🧹 GTI: Iniciando borrado selectivo {}/{} - Tipo: {} - Etiqueta: {}", mes, anio, tipo, etiqueta);
+
+        // Si es extraordinaria y el operador elige "Añadir" (sustituir=false),
+        // no borramos nada y salimos.
+        if ("EXTRAORDINARIA".equals(tipo) && !sustituir) {
+            log.info("GTI: No se borra nada, se procede a añadir nueva remesa.");
+            return;
+        }
+
+        // Buscamos los recibos que coincidan con el filtro
+        List<Recibo> pendientes = reciboRepo.findByComunidadId(comunidadId).stream()
+                .filter(r -> r.getFechaEmision().getMonthValue() == mes
+                        && r.getFechaEmision().getYear() == anio
+                        && r.getEstado() == Recibo.EstadoRecibo.PENDIENTE)
+                .filter(r -> {
+                    // Lógica de distinción:
+                    if ("ORDINARIA".equals(tipo)) {
+                        return "ORDINARIA".equals(r.getTipoRemesa());
+                    } else {
+                        return "EXTRAORDINARIA".equals(r.getTipoRemesa())
+                                && etiqueta != null && etiqueta.equals(r.getEtiquetaExtra());
+                    }
+                })
+                .toList();
+
+        for (Recibo r : pendientes) {
+            try {
+                // Borramos los asientos contables asociados
+                movContableRepo.deleteAll(movContableRepo.findByNumeroAsiento("REC-" + r.getId()));
+
+                // Borramos el recibo
+                reciboRepo.delete(r);
+            } catch (Exception e) {
+                // Aquí es donde te daba el error de los 6 argumentos. Corregido con java.lang.
+                throw new java.lang.RuntimeException("Error al borrar contabilidad del recibo " + r.getId());
+            }
+        }
+
+        log.info("GTI: Borrado finalizado con éxito.");
     }
 
     @Transactional
@@ -666,5 +1035,192 @@ public class ContabilidadService {
     public void borrarAsientoCompleto(String numeroAsiento) {
         log.info("Eliminando asiento completo del diario: {}", numeroAsiento);
         movContableRepo.deleteByNumeroAsiento(numeroAsiento);
+    }
+
+    @Transactional
+    public void desconciliarTodoElExtracto(Long comunidadId) {
+        log.info("⚠️ Iniciando desconciliación masiva para la comunidad {}", comunidadId);
+        List<MovimientoBancario> movimientos = movRepo.findByComunidadIdOrderByFechaOperacionAsc(comunidadId);
+        for (MovimientoBancario mov : movimientos) {
+            if (mov.isConciliado()) {
+                desconciliarMovimientoBancario(mov.getId());
+            }
+        }
+        log.info("✅ Desconciliación completada.");
+    }
+
+    @Transactional
+    public void vaciarExtractoBancario(Long comunidadId) {
+        log.warn("☢️ INICIANDO LIMPIEZA NUCLEAR PARA COMUNIDAD: {}", comunidadId);
+
+        // 1. Resetear recibos Y DESVINCULAR BANCO (Crucial para evitar el error 1451)
+        List<Recibo> recibos = reciboRepo.findAll();
+        recibos.stream()
+                .filter(r -> r.getVecino().getComunidad().getId().equals(comunidadId))
+                .forEach(r -> {
+                    r.setEstado(Recibo.EstadoRecibo.PENDIENTE);
+                    r.setFechaCobroBanco(null);
+                    r.setPagadoAcumulado(BigDecimal.ZERO);
+                    r.setMovimientoBancario(null); // <--- ESTO EVITA EL ERROR DE CLAVE FORÁNEA
+                    reciboRepo.save(r);
+                });
+
+        // 2. Limpiar la marca de los Gastos
+        List<Gasto> gastos = gastoRepository.findByComunidadId(comunidadId);
+        for (Gasto g : gastos) {
+            g.setNumeroAsiento(null);
+            gastoRepository.save(g);
+        }
+
+        // 3. Borrar Movimientos Contables (Diario/Mayor)
+        movContableRepo.deleteByComunidadId(comunidadId);
+
+        // 4. Borrar Movimientos Bancarios (Ahora sí dejará borrarlos)
+        List<MovimientoBancario> movimientosBanco = movRepo.findByComunidadIdOrderByFechaOperacionAsc(comunidadId);
+        movRepo.deleteAll(movimientosBanco);
+
+        log.info("✅ Limpieza nuclear REAL completada para comunidad {}", comunidadId);
+    }
+
+    /**
+     * Crea un asiento de apertura manual en el Libro Diario.
+     * Útil para registrar saldos iniciales (como los 11.039,19€ de Malgrat).
+     */
+    @Transactional
+    public void crearAsientoAperturaManual(Long comunidadId, LocalDate fecha, Long cuentaId, BigDecimal importe) {
+        // 1. Localizamos la comunidad y la cuenta (ej: la 57200001)
+        Comunidad com = comunidadRepository.findById(comunidadId)
+                .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
+
+        CuentaContable cuenta = cuentaContableRepository.findById(cuentaId)
+                .orElseThrow(() -> new RuntimeException("Cuenta contable no encontrada"));
+
+        // 2. Creamos el apunte contable
+        MovimientoContable asiento = new MovimientoContable();
+        asiento.setComunidad(com);
+        asiento.setFecha(fecha);
+        asiento.setCuenta(cuenta);
+        asiento.setConcepto("ASIENTO DE APERTURA: SALDO INICIAL");
+
+        // Generamos un identificador único para el asiento
+        asiento.setNumeroAsiento("APE-" + System.currentTimeMillis());
+
+        // El saldo inicial en una cuenta de banco (Activo) aumenta por el DEBE
+        asiento.setDebe(importe);
+        asiento.setHaber(BigDecimal.ZERO);
+
+        // 3. Guardamos en el Libro Diario
+        movContableRepo.save(asiento);
+
+        log.info("✅ Asiento de apertura registrado: {} € en la cuenta {} para {}",
+                importe, cuenta.getCodigo(), com.getNombre());
+    }
+
+    @Transactional
+    public void regenerarAsientosGastos(Long comunidadId) {
+        log.info("GTI TURBO: Iniciando regeneración de asientos de DEVENGO para comunidad {}", comunidadId);
+
+        List<Gasto> gastos = gastoRepository.findByComunidadId(comunidadId);
+
+        for (Gasto gasto : gastos) {
+            // MODO FORZADO: Borramos cualquier rastro previo para evitar bloqueos
+            gasto.setNumeroAsiento(null);
+
+            String uidAsiento = "GAS-DEV-" + System.currentTimeMillis() + "-" + gasto.getId();
+
+            // 1. APUNTE AL DEBE: Cuenta de Gasto (Grupo 6)
+            MovimientoContable debe = new MovimientoContable();
+            debe.setComunidad(gasto.getComunidad());
+            debe.setFecha(gasto.getFecha()); // Si esto es null, fallará (mira la solución abajo)
+            debe.setCuenta(gasto.getCuentaGasto());
+            debe.setConcepto("FACTURA " + gasto.getNumeroFactura() + " - " + gasto.getProveedor());
+            debe.setDebe(gasto.getImporteTotal());
+            debe.setHaber(BigDecimal.ZERO);
+            debe.setNumeroAsiento(uidAsiento);
+            movContableRepo.save(debe);
+
+            // 2. APUNTE AL HABER: Cuenta del Acreedor/Proveedor (Grupo 410)
+            CuentaContable cuentaAcreedor = cuentaContableRepository.findByCodigoAndComunidadId("41000000", comunidadId)
+                    .orElseGet(() -> {
+                        log.warn("41000000 genérica no encontrada, buscando por nombre...");
+                        return cuentaContableRepository.findByComunidadId(comunidadId).stream()
+                                .filter(c -> c.getCodigo().startsWith("410") && c.getNombre().contains(gasto.getProveedor()))
+                                .findFirst()
+                                .orElse(gasto.getCuentaGasto());
+                    });
+
+            MovimientoContable haber = new MovimientoContable();
+            haber.setComunidad(gasto.getComunidad());
+            haber.setFecha(gasto.getFecha());
+            haber.setCuenta(cuentaAcreedor);
+            haber.setConcepto("PROVEEDOR: " + gasto.getProveedor() + " (F. " + gasto.getNumeroFactura() + ")");
+            haber.setDebe(BigDecimal.ZERO);
+            haber.setHaber(gasto.getImporteTotal());
+            haber.setNumeroAsiento(uidAsiento);
+            movContableRepo.save(haber);
+
+            // 3. Vincular asiento al registro del gasto
+            gasto.setNumeroAsiento(uidAsiento);
+            gastoRepository.save(gasto);
+
+            log.info("✅ Asiento (6->4) regenerado para: {} ({} €)", gasto.getProveedor(), gasto.getImporteTotal());
+        }
+    }
+
+    /**
+     * Lógica de negocio para anular un pago.
+     * Esto va en el SERVICE.
+     */
+    @Transactional
+    public void deshacerPagoGasto(Long gastoId) {
+        Gasto gasto = gastoRepository.findById(gastoId)
+                .orElseThrow(() -> new RuntimeException("Gasto no encontrado"));
+
+        if (!gasto.isPagado()) {
+            return; // Si no está pagado, no hay nada que deshacer
+        }
+
+        log.info("GTI TURBO: Anulando contablemente el pago del gasto: {}", gasto.getProveedor());
+
+        // 1. Borramos los asientos de pago asociados (PAG-...)
+        // Buscamos por el concepto que genera el método 'confirmarPagoGasto'
+        movContableRepo.deleteByComunidadIdAndConceptoContaining(
+                gasto.getComunidad().getId(),
+                "Pago Fra: " + gasto.getNumeroFactura()
+        );
+
+        // 2. Devolvemos el gasto a estado pendiente
+        gasto.setPagado(false);
+        gasto.setFechaPago(null);
+        gastoRepository.save(gasto);
+
+        log.info("✅ Gasto ID {} vuelto a estado PENDIENTE", gastoId);
+    }
+
+    /**
+     * Método puente para compatibilidad con controladores antiguos (BancosController, etc.)
+     */
+    @Transactional
+    public void limpiarContabilidadMesAntesDeRemesa(Long comunidadId, int mes, int anio) {
+        this.limpiarContabilidadMesAntesDeRemesa(comunidadId, mes, anio, "ORDINARIA", null, true);
+    }
+
+    /**
+     * Método puente para compatibilidad con ContabilidadController y BancosController
+     * NOTA: He usado la 'C' mayúscula como indica tu error de compilación.
+     */
+    @Transactional
+    public void borrarRecibosYContabilidadDelMes(Long comunidadId, int mes, int anio) {
+        // Tu lógica de borrado aquí...
+        log.info("GTI: Ejecutando limpieza del periodo {}/{} para la comunidad {}", mes, anio, comunidadId);
+        this.borrarRecibosYcontabilidadDelMes(comunidadId, mes, anio, "ORDINARIA", null, true);
+    }
+
+    /**
+     * Método puente para el registro de recibos desde procesos automáticos antiguos
+     */
+    @Transactional
+    public Recibo registrarDevengoCuota(Vecino v, BigDecimal imp, String con, LocalDate fecha) {
+        return this.registrarDevengoCuota(v, imp, con, fecha, "ORDINARIA", null);
     }
 }

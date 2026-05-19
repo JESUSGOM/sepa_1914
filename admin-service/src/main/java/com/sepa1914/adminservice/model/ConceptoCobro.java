@@ -32,6 +32,12 @@ public class ConceptoCobro {
     @Column(nullable = false)
     private Periodicidad periodicidad = Periodicidad.MENSUAL;
 
+    @Enumerated(EnumType.STRING)
+    private TipoImpuesto tipoImpuesto = TipoImpuesto.EXENTO;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal porcentajeImpuesto = BigDecimal.ZERO;
+
     // RELACIÓN: El vecino al que pertenece este concepto
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vecino_id")
@@ -162,4 +168,12 @@ public class ConceptoCobro {
     public void setMovimientoBancarioId(Long movimientoBancarioId) {
         this.movimientoBancarioId = movimientoBancarioId;
     }
+
+    public TipoImpuesto getTipoImpuesto(){ return tipoImpuesto; }
+
+    public void setTipoImpuesto(TipoImpuesto tipoImpuesto){ this.tipoImpuesto = tipoImpuesto;}
+
+    public BigDecimal getPorcentajeImpuesto() { return porcentajeImpuesto; }
+
+    public void setPorcentajeImpuesto(BigDecimal porcentajeImpuesto) { this.porcentajeImpuesto = porcentajeImpuesto; }
 }

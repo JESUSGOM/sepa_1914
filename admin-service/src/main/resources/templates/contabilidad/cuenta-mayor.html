@@ -29,9 +29,34 @@
                 <div class="text-end">
                     <div class="p-2 bg-white rounded shadow-sm border-start border-4"
                          th:classappend="${saldoFinalAnual >= 0 ? 'border-success' : 'border-danger'}">
-                        <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.6rem;">Saldo Final Ejercicio</small>
+                        <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.6rem;">Saldo Final Selección</small>
                         <span class="h5 mb-0 fw-bold" th:text="${#numbers.formatDecimal(saldoFinalAnual, 1, 2, 'COMMA')} + ' €'"></span>
                     </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-3 bg-white">
+                <div class="card-body py-2">
+                    <form th:action="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id})}" method="get" class="row g-2 align-items-end small">
+                        <input type="hidden" name="ano" th:value="${ejercicio}">
+                        <div class="col-md-2">
+                            <label class="form-label mb-1 fw-bold text-muted">Desde Fecha:</label>
+                            <input type="date" name="fechaDesde" th:value="${fechaDesde}" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label mb-1 fw-bold text-muted">Hasta Fecha:</label>
+                            <input type="date" name="fechaHasta" th:value="${fechaHasta}" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label mb-1 fw-bold text-muted">Buscador Interno (Asiento, Concepto, Importe):</label>
+                            <input type="text" name="buscar" th:value="${searchTerm}" class="form-control form-control-sm" placeholder="Buscar texto o importe...">
+                        </div>
+                        <div class="col-md-4 d-flex gap-1 justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-primary fw-bold px-3"><i class="bi bi-filter"></i> Filtrar</button>
+                            <a th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, fechaDesde=${ejercicio + '-01-01'}, fechaHasta=${ejercicio + '-12-31'})}" class="btn btn-sm btn-outline-dark fw-bold">Año Completo</a>
+                            <a th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio})}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
+                        </div>
+                    </form>
                 </div>
             </div>
 
@@ -50,6 +75,18 @@
                             </tr>
                             </thead>
                             <tbody class="small">
+
+                            <tr th:if="${currentPage == 0}" class="table-light fst-italic text-muted">
+                                <td class="ps-3" th:text="${#temporals.format(fechaDesde, 'dd/MM/yyyy')}"></td>
+                                <td class="text-center"><span class="badge bg-secondary-subtle text-dark border">SALDO_ANT</span></td>
+                                <td class="fw-bold text-dark-50">SALDO ANTERIOR AL PERIODO EXTRAÍDO</td>
+                                <td></td>
+                                <td></td>
+                                <td class="text-end pe-3 fw-bold"
+                                    th:classappend="${saldoAnterior >= 0 ? 'text-primary' : 'text-danger'}"
+                                    th:text="${#numbers.formatDecimal(saldoAnterior, 1, 2, 'COMMA')} + ' €'"></td>
+                            </tr>
+
                             <tr th:each="m : ${movimientos}">
                                 <td class="ps-3" th:text="${#temporals.format(m.fecha(), 'dd/MM/yyyy')}"></td>
                                 <td class="text-center"><span class="badge bg-light text-dark border" th:text="${m.numeroAsiento()}"></span></td>
@@ -60,6 +97,10 @@
                                     th:classappend="${m.saldoAcumulado() >= 0 ? 'text-primary' : 'text-danger'}"
                                     th:text="${#numbers.formatDecimal(m.saldoAcumulado(), 1, 2, 'COMMA')} + ' €'"></td>
                             </tr>
+
+                            <tr th:if="${#lists.isEmpty(movimientos)}">
+                                <td colspan="6" class="text-center py-4 text-muted fst-italic">No se han localizado apuntes contables para el filtro aplicado.</td>
+                            </tr>
                             </tbody>
                         </table>
                     </div>
@@ -69,16 +110,16 @@
             <nav th:if="${totalPages > 1}" class="mt-4">
                 <ul class="pagination pagination-sm justify-content-center">
                     <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
-                        <a class="page-link shadow-sm" th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, page=${currentPage - 1})}">Anterior</a>
+                        <a class="page-link shadow-sm" th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, fechaDesde=${fechaDesde}, fechaHasta=${fechaHasta}, buscar=${searchTerm}, page=${currentPage - 1})}">Anterior</a>
                     </li>
                     <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}" th:classappend="${currentPage == i ? 'active' : ''}">
-                        <a class="page-link shadow-sm" th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, page=${i})}" th:text="${i + 1}">1</a>
+                        <a class="page-link shadow-sm" th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, fechaDesde=${fechaDesde}, fechaHasta=${fechaHasta}, buscar=${searchTerm}, page=${i})}" th:text="${i + 1}">1</a>
                     </li>
                     <li class="page-item" th:classappend="${currentPage == totalPages - 1 ? 'disabled' : ''}">
-                        <a class="page-link shadow-sm" th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, page=${currentPage + 1})}">Siguiente</a>
+                        <a class="page-link shadow-sm" th:href="@{/contabilidad/cuenta/mayor/{id}(id=${cuenta.id}, ano=${ejercicio}, fechaDesde=${fechaDesde}, fechaHasta=${fechaHasta}, buscar=${searchTerm}, page=${currentPage + 1})}">Siguiente</a>
                     </li>
                 </ul>
-                <p class="text-center text-muted small" th:text="${'Mostrando movimientos ' + (currentPage * 20 + 1) + ' al ' + (currentPage * 20 + movimientos.size()) + ' de ' + totalItems}"></p>
+                <p class="text-center text-muted small" th:text="${'Filtrados ' + totalItems + ' movimientos en total'}"></p>
             </nav>
 
         </main>

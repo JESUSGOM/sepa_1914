@@ -189,4 +189,18 @@ public interface ReciboRepository extends JpaRepository<Recibo, Long> {
     List<Recibo> findByVecinoIdAndEstadoNot(Long vecinoId, EstadoRecibo estado);
 
     List<Recibo> findByVecinoIdOrderByFechaEmisionAsc(Long vecinoId);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Recibo r WHERE r.comunidad.id = :comunidadId " +
+            "AND MONTH(r.fechaEmision) = :mes AND YEAR(r.fechaEmision) = :anio " +
+            "AND r.tipoRemesa = 'ORDINARIA'")
+    void borrarRecibosOrdinariosMes(@Param("comunidadId") Long comunidadId, @Param("mes") int mes, @Param("anio") int anio);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Recibo r WHERE r.comunidad.id = :comunidadId " +
+            "AND MONTH(r.fechaEmision) = :mes AND YEAR(r.fechaEmision) = :anio " +
+            "AND r.tipoRemesa = 'EXTRAORDINARIA' AND r.etiquetaExtra = :etiqueta")
+    void borrarRecibosExtraordinariosPorEtiqueta(@Param("comunidadId") Long comunidadId, @Param("mes") int mes, @Param("anio") int anio, @Param("etiqueta") String etiqueta);
 }

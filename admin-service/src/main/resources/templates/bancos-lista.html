@@ -8,210 +8,462 @@
     <div class="row">
         <div th:replace="~{layout :: menu}"></div>
 
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+            <nav aria-label="breadcrumb" class="mb-2">
+                <ol class="breadcrumb mb-0 small">
                     <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
                     <li class="breadcrumb-item active">Extracto Bancario</li>
                 </ol>
             </nav>
 
-            <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
                 <div>
-                    <h1 class="h2 mb-0"><i class="bi bi-bank text-primary"></i> Extracto de Cuenta</h1>
-                    <p class="text-muted mb-0" th:text="${comunidad.nombre}">Nombre Comunidad</p>
+                    <h1 class="h4 mb-0"><i class="bi bi-bank text-primary me-2"></i>Extracto de Cuenta</h1>
+                    <p class="text-muted small mb-0" th:text="${comunidad.nombre}">Nombre Comunidad</p>
                 </div>
                 <div class="btn-toolbar gap-2">
+                    <button type="button" class="btn btn-sm btn-primary shadow-sm fw-bold d-none" id="btnConciliarMultiples" onclick="abrirModalMultiConciliacion()">
+                        <i class="bi bi-shuffle"></i> Conciliar Agrupados (<span id="lblCountChecked">0</span>)
+                    </button>
+
                     <form th:action="@{/bancos/auto-conciliar/{id}(id=${comunidad.id})}" method="post">
-                        <button type="submit" class="btn btn-success shadow-sm"><i class="bi bi-magic"></i> Conciliación Inteligente</button>
+                        <button type="submit" class="btn btn-sm btn-success shadow-sm fw-bold"><i class="bi bi-magic"></i> Conciliación Inteligente</button>
                     </form>
-                    <a th:href="@{/bancos/importar/{id}(id=${comunidad.id})}" class="btn btn-primary shadow-sm"><i class="bi bi-file-earmark-arrow-up"></i> Importar Norma 43</a>
+
+                    <form th:action="@{/bancos/vaciar-extracto}" method="post"
+                          onsubmit="return confirm('¡ATENCIÓN! Esto borrará todos los movimientos y sus asientos contables de esta finca. ¿Estás seguro?');">
+                        <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger shadow-sm">
+                            <i class="bi bi-trash"></i> Vaciar Extracto
+                        </button>
+                    </form>
+
+                    <button class="btn btn-sm btn-primary shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalImport">
+                        <i class="bi bi-file-earmark-arrow-up"></i> Importar N43
+                    </button>
                 </div>
             </div>
 
-            <div th:if="${mensaje}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
-                <i class="bi bi-check-circle-fill me-2"></i><span th:text="${mensaje}">Mensaje</span>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <div th:if="${mensaje != null}" class="alert alert-success alert-dismissible fade show shadow-sm py-2 px-3 small" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <span th:text="${mensaje}">Mensaje de éxito</span>
+                <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Cerrar"></button>
             </div>
 
-            <div class="row mb-4">
-                <div class="col-md-4">
-                    <div class="card border-0 shadow-sm bg-white"><div class="card-body">
-                        <h6 class="text-uppercase small fw-bold text-muted">IBAN de Abono</h6>
-                        <p class="h5 mb-0 font-monospace text-primary" th:text="${comunidad.iban}">ES00...</p>
-                    </div></div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card border-0 shadow-sm bg-white"><div class="card-body">
-                        <h6 class="text-uppercase small fw-bold text-muted">Movimientos Pendientes</h6>
-                        <p class="h5 mb-0 text-warning">
-                            <i class="bi bi-clock-history"></i>
-                            <span th:text="${#lists.size(movimientos.?[conciliado == false])}">0</span>
-                        </p>
-                    </div></div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card border-0 shadow-sm bg-dark text-white"><div class="card-body text-end">
-                        <h6 class="text-uppercase small fw-bold opacity-75">Estado Actual</h6>
-                        <p class="h5 mb-0">EJERCICIO 2026</p>
-                    </div></div>
-                </div>
+            <div th:if="${error != null}" class="alert alert-danger alert-dismissible fade show shadow-sm py-2 px-3 small" role="alert">
+                <i class="bi bi-exclamation-octagon-fill me-2"></i>
+                <span th:text="${error}">Mensaje de error</span>
+                <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Cerrar"></button>
             </div>
 
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-body py-2 px-3 bg-white rounded d-flex justify-content-between align-items-center">
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" id="btn-todos" class="btn btn-outline-secondary active">Todos</button>
-                        <button type="button" id="btn-pendientes" class="btn btn-outline-warning">Pendientes</button>
-                        <button type="button" id="btn-conciliados" class="btn btn-outline-success">Conciliados</button>
+            <div class="row mb-3 g-2 align-items-center">
+                <div class="col-md-4">
+                    <div class="btn-group btn-group-sm shadow-sm" role="group">
+                        <button type="button" class="btn btn-outline-dark active" id="btn-todos" onclick="filtrarEstado('TODOS', this)">Todos</button>
+                        <button type="button" class="btn btn-outline-dark" id="btn-pendientes" onclick="filtrarEstado('PENDIENTE', this)">Pendientes</button>
+                        <button type="button" class="btn btn-outline-dark" id="btn-conciliados" onclick="filtrarEstado('CONCILIADO', this)">Conciliados</button>
                     </div>
                 </div>
+                <div class="col-md-4">
+                    <form th:action="@{/bancos/movimientos/{id}(id=${comunidad.id})}" method="get" class="d-flex gap-1">
+                        <input type="hidden" name="page" value="0">
+                        <input type="hidden" name="sortField" th:value="${sortField}">
+                        <input type="hidden" name="sortDir" th:value="${sortDir}">
+                        <div class="input-group input-group-sm shadow-sm">
+                            <span class="input-group-text bg-white"><i class="bi bi-currency-euro text-muted"></i></span>
+                            <input type="text" name="importe" th:value="${importeBusqueda}" class="form-control" placeholder="Buscar importe exacto (ej: 138,51)...">
+                            <button type="submit" class="btn btn-primary fw-bold">Buscar</button>
+                            <a th:if="${importeBusqueda != null && !importeBusqueda.isEmpty()}" th:href="@{/bancos/movimientos/{id}(id=${comunidad.id})}" class="btn btn-outline-secondary"><i class="bi bi-x-circle"></i></a>
+                        </div>
+                    </form>
+                </div>
             </div>
 
-            <div class="card shadow-sm border-0">
+            <div th:if="${totalItems > 0}" class="card shadow-sm border-0 mb-3">
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0" id="tablaMovimientos">
                             <thead class="table-dark small text-uppercase">
                             <tr>
-                                <th class="ps-4">Fecha</th>
-                                <th>Concepto Detallado</th>
-                                <th class="text-center">Estado</th>
-                                <th class="text-end">Importe</th>
-                                <th class="text-center pe-4">Acciones</th>
+                                <th class="text-center" style="width: 4%;">
+                                    <input type="checkbox" id="checkAllMovs" onclick="toggleAllMovimientos(this)">
+                                </th>
+                                <th style="width: 12%;">
+                                    <a th:href="@{/bancos/movimientos/{id}(id=${comunidad.id}, page=${currentPage}, importe=${importeBusqueda}, sortField='fechaOperacion', sortDir=${reverseSortDir})}" class="text-white text-decoration-none d-flex align-items-center gap-1">
+                                        Fecha
+                                        <i class="bi" th:classappend="${sortField == 'fechaOperacion'} ? (${sortDir == 'asc'} ? 'bi-arrow-up-short' : 'bi-arrow-down-short') : 'bi-arrow-down-up opacity-50'"></i>
+                                    </a>
+                                </th>
+                                <th style="width: 38%;">
+                                    <a th:href="@{/bancos/movimientos/{id}(id=${comunidad.id}, page=${currentPage}, importe=${importeBusqueda}, sortField='concepto', sortDir=${reverseSortDir})}" class="text-white text-decoration-none d-flex align-items-center gap-1">
+                                        Concepto / Detalle Bancario
+                                        <i class="bi" th:classappend="${sortField == 'concepto'} ? (${sortDir == 'asc'} ? 'bi-arrow-up-short' : 'bi-arrow-down-short') : 'bi-arrow-down-up opacity-50'"></i>
+                                    </a>
+                                </th>
+                                <th style="width: 16%;">Referencia Doc.</th>
+                                <th class="text-center" style="width: 12%;">Estado</th>
+                                <th class="text-end" style="width: 12%;">
+                                    <a th:href="@{/bancos/movimientos/{id}(id=${comunidad.id}, page=${currentPage}, importe=${importeBusqueda}, sortField='importe', sortDir=${reverseSortDir})}" class="text-white text-decoration-none d-flex align-items-center gap-1 justify-content-end">
+                                        Importe
+                                        <i class="bi" th:classappend="${sortField == 'importe'} ? (${sortDir == 'asc'} ? 'bi-arrow-up-short' : 'bi-arrow-down-short') : 'bi-arrow-down-up opacity-50'"></i>
+                                    </a>
+                                </th>
+                                <th class="text-center pe-4" style="width: 8%;">Acciones</th>
                             </tr>
                             </thead>
-                            <tbody>
-                            <tr th:each="m : ${movimientos}" th:classappend="${m.conciliado ? 'table-light opacity-75' : ''}">
-                                <td class="ps-4">
-                                    <div th:text="${#temporals.format(m.fechaOperacion, 'dd/MM/yyyy')}" class="fw-bold">01/01/2026</div>
-                                    <span class="d-none" th:text="${m.conciliado ? 'CONCILIADO' : 'PENDIENTE'}"></span>
-                                </td>
-                                <td class="col-concepto-container">
-                                    <div class="concepto-texto fw-semibold text-secondary" th:text="${m.concepto}" th:title="${m.concepto}">CONCEPTO</div>
-                                </td>
+                            <tbody class="small">
+                            <tr th:each="mov : ${movimientos}" class="movimiento-fila"
+                                th:data-estado="${mov.conciliado ? 'CONCILIADO' : 'PENDIENTE'}"
+                                th:classappend="${mov.signo == '1' || mov.importe.signum() == -1 ? 'table-danger-light' : 'table-success-light'}">
+
                                 <td class="text-center">
-                                    <span th:if="${m.conciliado}" class="badge bg-success-subtle text-success border border-success-subtle">CONCILIADO</span>
-                                    <span th:unless="${m.conciliado}" class="badge bg-warning-subtle text-warning border border-warning-subtle">PENDIENTE</span>
+                                    <input type="checkbox" th:if="${!mov.conciliado}" class="check-mov-id" th:value="${mov.id}" th:data-importe="${mov.importe}" th:data-signo="${mov.signo}" th:data-concepto="${mov.concepto}" onclick="actualizarSeleccionMulti()">
                                 </td>
-                                <td class="text-end fw-bold">
-                                    <span th:class="${m.signo == '1' or m.importe < 0 ? 'text-danger' : 'text-success'}">
-                                        <span th:text="${m.signo == '1' or m.importe < 0 ? '-' : ''}"></span><span th:text="${#numbers.formatDecimal(m.importe.abs(), 1, 2, 'COMMA')}">0,00</span> €
+
+                                <td class="ps-2 font-monospace fw-bold text-secondary" th:text="${#temporals.format(mov.fechaOperacion, 'dd/MM/yyyy')}">01/01/2024</td>
+
+                                <td class="fw-bold text-dark" th:text="${mov.concepto}">Concepto</td>
+
+                                <td class="text-muted font-monospace" th:text="${mov.documentoExtra != null && !mov.documentoExtra.isEmpty() ? mov.documentoExtra : 'S/R'}">Ref: 0000</td>
+
+                                <td class="text-center">
+                                    <span th:if="${mov.conciliado}" class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                        <i class="bi bi-check-circle-fill"></i> CONCILIADO
+                                    </span>
+                                    <span th:if="${!mov.conciliado}" class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
+                                        <i class="bi bi-clock-history"></i> PENDIENTE
                                     </span>
                                 </td>
-                                <<td class="text-center pe-4">
-                                <div class="btn-group shadow-sm" th:if="${!m.conciliado}">
-                                    <a th:href="@{/bancos/conciliar/{id}(id=${m.id})}" class="btn btn-sm btn-outline-primary" title="Conciliación">
-                                        <i class="bi bi-arrow-left-right"></i>
-                                    </a>
-                                    <button th:if="${m.signo == '1' or m.importe < 0}" type="button" class="btn btn-sm btn-outline-danger"
-                                            th:data-id="${m.id}"
-                                            th:data-concepto="${m.concepto}"
-                                            th:data-importe="${m.importe}"
-                                            onclick="prepararDevolucion(this.getAttribute('data-id'), this.getAttribute('data-concepto'), this.getAttribute('data-importe'))"
-                                            title="Procesar Devolución">
-                                        <i class="bi bi-person-dash-fill"></i>
-                                    </button>
-                                </div>
-                            </td>
+
+                                <td class="text-end fw-bold font-monospace fs-6" th:classappend="${mov.signo == '1' || mov.importe.signum() == -1 ? 'text-danger' : 'text-success'}">
+                                    <span th:text="${(mov.signo == '1' || mov.importe.signum() == -1 ? '-' : '') + #numbers.formatDecimal(mov.importe.abs(), 1, 'POINT', 2, 'COMMA')}">0,00</span> €
+                                </td>
+
+                                <td class="text-center pe-4">
+                                    <div class="btn-group btn-group-sm shadow-sm" th:if="${!mov.conciliado}">
+                                        <a th:href="@{/bancos/conciliar/{id}(id=${mov.id})}" class="btn btn-primary" title="Conciliar">
+                                            <i class="bi bi-link-45deg"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-danger"
+                                                th:data-id="${mov.id}"
+                                                th:data-concepto="${mov.concepto}"
+                                                th:data-importe="${#numbers.formatDecimal(mov.importe, 1, 'POINT', 2, 'POINT')}"
+                                                onclick="prepararDevolucion(this.getAttribute('data-id'), this.getAttribute('data-concepto'), this.getAttribute('data-importe'))"
+                                                data-bs-toggle="modal" data-bs-target="#modalDevolucion" title="Marcar Devolución">
+                                            <i class="bi bi-arrow-return-left"></i>
+                                        </button>
+                                    </div>
+                                    <div class="btn-group btn-group-sm shadow-sm" th:if="${mov.conciliado}">
+                                        <form th:action="@{/bancos/desconciliar/{id}(id=${mov.id})}" method="post" class="m-0">
+                                            <button type="submit" class="btn btn-outline-secondary" title="Deshacer Conciliación">
+                                                <i class="bi bi-unlock"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
                             </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
+
+            <nav th:if="${totalPages > 1}" aria-label="Navegación del extracto bancario">
+                <ul class="pagination pagination-sm justify-content-center">
+                    <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
+                        <a class="page-link shadow-sm" th:href="@{/bancos/movimientos/{id}(id=${comunidad.id}, page=${currentPage - 1}, importe=${importeBusqueda}, sortField=${sortField}, sortDir=${sortDir})}">Anterior</a>
+                    </li>
+                    <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}" th:classappend="${currentPage == i ? 'active' : ''}">
+                        <a class="page-link shadow-sm" th:href="@{/bancos/movimientos/{id}(id=${comunidad.id}, page=${i}, importe=${importeBusqueda}, sortField=${sortField}, sortDir=${sortDir})}" th:text="${i + 1}">1</a>
+                    </li>
+                    <li class="page-item" th:classappend="${currentPage == totalPages - 1 ? 'disabled' : ''}">
+                        <a class="page-link shadow-sm" th:href="@{/bancos/movimientos/{id}(id=${comunidad.id}, page=${currentPage + 1}, importe=${importeBusqueda}, sortField=${sortField}, sortDir=${sortDir})}">Siguiente</a>
+                    </li>
+                </ul>
+                <p class="text-center text-muted small" th:text="${'Mostrando página ' + (currentPage + 1) + ' de ' + totalPages + ' | ' + totalItems + ' movimientos encontrados'}"></p>
+            </nav>
+
+            <div th:if="${totalItems == 0}" class="text-center py-5">
+                <i class="bi bi-folder-x display-3 text-muted"></i>
+                <p class="h5 mt-3 text-muted">No se localizaron asientos bancarios en este tramo.</p>
+            </div>
         </main>
+    </div>
+</div>
+
+<div class="modal fade" id="modalConciliarMultiples" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form th:action="@{/bancos/conciliar-multiples}" method="post">
+            <div id="hiddenMovInputs"></div> <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-2 px-3">
+                <h5 class="modal-title small text-uppercase fw-bold"><i class="bi bi-shuffle me-2"></i>Conciliación de Multi-Abono Agrupado</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <div class="row g-2 mb-3 text-center">
+                    <div class="col-md-6">
+                        <div class="p-2 bg-dark text-white rounded shadow-sm">
+                            <small class="d-block text-uppercase text-muted" style="font-size: 0.65rem;">Suma Total Banco</small>
+                            <span class="h5 mb-0 font-monospace fw-bold"><span id="spanTotalAgrupado">0,00</span> €</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div id="divCardTotalRecibos" class="p-2 bg-secondary text-white rounded shadow-sm" style="transition: background-color 0.3s ease;">
+                            <small class="d-block text-uppercase text-muted" style="font-size: 0.65rem;">Suma Recibos Marcados</small>
+                            <span class="h5 mb-0 font-monospace fw-bold"><span id="spanTotalRecibosMarcados">0,00</span> €</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-12">
+                        <div class="p-2 bg-light rounded border-start border-primary border-4" style="font-size: 0.8rem;">
+                            <small class="text-muted fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem;">Líneas Bancarias Agrupadas</small>
+                            <div id="divListaMovsSeleccionados" class="overflow-auto font-monospace" style="max-height: 80px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold text-secondary mb-2" style="font-size: 0.85rem;"><i class="bi bi-card-checklist me-1"></i>Selecciona los Recibos de Propietarios a liquidar con esta suma:</h6>
+                <div class="table-responsive border rounded" style="max-height: 220px;">
+                    <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.8rem;">
+                        <thead class="table-light sticky-top shadow-sm">
+                        <tr>
+                            <th class="text-center" style="width: 8%;">Elegir</th>
+                            <th style="width: 50%;">Propietario / Vivienda</th>
+                            <th style="width: 22%;">Emisión</th>
+                            <th class="text-end pe-3" style="width: 20%;">Importe</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="rec : ${recibosPendientes}">
+                            <td class="text-center">
+                                <input type="checkbox" class="check-recibo-id" name="reciboIds" th:value="${rec.id}" th:data-importe="${rec.importe}" onchange="actualizarSumaRecibosMarcados()">
+                            </td>
+                            <td>
+                                <div class="fw-bold text-dark" th:text="${rec.vecino.nombre + ' (' + rec.vecino.vivienda + ')'}">Propietario</div>
+                                <small class="text-muted text-uppercase font-monospace" style="font-size: 0.7rem;" th:text="${rec.concepto}">Concepto</small>
+                            </td>
+                            <td th:text="${#temporals.format(rec.fechaEmision, 'dd/MM/yyyy')}">01/05/2026</td>
+                            <td class="text-end pe-3 fw-bold font-monospace text-primary" th:text="${#numbers.formatDecimal(rec.importe, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(recibosPendientes)}">
+                            <td colspan="4" class="text-center py-3 text-muted fst-italic">No existen recibos con saldos pendientes en la finca.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer py-1.5">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-sm btn-success fw-bold"><i class="bi bi-check-all"></i> Ejecutar Asientos y Liquidar</button>
+            </div>
+        </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalImport" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form th:action="@{/bancos/importar-n43}" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="comunidadId" th:value="${comunidad.id}">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Importar Norma 43</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Seleccione el fichero .txt del banco:</label>
+                        <input type="file" name="archivo" class="form-control" accept=".txt,.n43" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Subir y Procesar</button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 
 <div class="modal fade" id="modalDevolucion" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <form th:action="@{/bancos/procesar-devolucion}" method="post">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header bg-danger text-white py-2">
-                    <h6 class="modal-title fw-bold small text-uppercase">Registrar Devolución</h6>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <input type="hidden" name="movimientoId" id="dev_movimientoId">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Registrar Devolución Bancaria</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body bg-light">
-                    <input type="hidden" id="dev_movimientoId" name="movimientoId">
-                    <div class="p-3 bg-white border rounded mb-3">
-                        <div class="small fw-bold text-danger">Movimiento original:</div>
-                        <div id="dev_info_concepto" class="small text-muted"></div>
-                        <div class="fw-bold h5 mb-0" id="dev_info_importe"></div>
+                <div class="modal-body">
+                    <p>Vas a marcar el siguiente movimiento como una devolución:</p>
+                    <div class="p-3 bg-light rounded mb-3">
+                        <div class="small text-muted">Concepto:</div>
+                        <div id="dev_info_concepto" class="fw-bold"></div>
+                        <div class="small text-muted mt-2">Importe:</div>
+                        <div class="fw-bold text-danger"><span id="dev_info_importe"></span> €</div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Asignar Cargo a Propietario</label>
-                        <select name="vecinoId" class="form-select" required>
-                            <option value="">-- Seleccione Vecino --</option>
-                            <option th:each="v : ${comunidad.vecinos}" th:value="${v.id}" th:text="${v.nombre + ' - ' + v.vivienda}"></option>
+                        <label class="form-label fw-bold">Seleccionar Propietario afectado:</label>
+                        <select name="vecinoId" class="form-select form-select-sm" required>
+                            <option value="">-- Seleccionar Vecino --</option>
+                            <option th:each="v : ${comunidad.vecinos}" th:value="${v.id}" th:text="${v.nombre + ' (' + v.vivienda + ')'}"></option>
                         </select>
                     </div>
+                    <div class="alert alert-warning small mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> Esto reabrirá la deuda del vecino en su ficha y generará los asientos de gastos por devolución asociados.
+                    </div>
                 </div>
-                <div class="modal-footer"><button type="submit" class="btn btn-danger btn-sm">Generar Cargo por Devolución</button></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Confirmar Devolución</button>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-<script src="https://code.jquery.com/jquery-3.7.0.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <style>
-    /* Estilo para conceptos largos con expansión al pasar el ratón */
-    .col-concepto-container { max-width: 350px; position: relative; }
-    .concepto-texto {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        cursor: help;
-        transition: all 0.2s ease;
-    }
-    .concepto-texto:hover {
-        white-space: normal;
-        background: #fff3cd;
-        padding: 8px;
-        border-radius: 4px;
-        position: absolute;
-        z-index: 100;
-        width: 100%;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        border: 1px solid #ffeeba;
-    }
     .bg-success-subtle { background-color: #d1e7dd !important; }
     .bg-warning-subtle { background-color: #fff3cd !important; }
-    .table-hover tbody tr:hover { background-color: rgba(0,0,0,.02); }
+    .table-hover tbody tr:hover { background-color: rgba(0,0,0,.015); }
+    .table-danger-light { background-color: rgba(220, 53, 69, 0.03) !important; }
+    .table-success-light { background-color: rgba(25, 135, 84, 0.01) !important; }
+    .page-link { border-radius: 4px; margin: 0 2px; }
 </style>
 
 <script th:inline="javascript">
-    $(document).ready(function() {
-        const tabla = $('#tablaMovimientos').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" },
-            "order": [ [ 0, 'desc' ] ],
-            "pageLength": 25
-        });
-        $('#btn-todos').on('click', function() {
-            $('.btn-group button').removeClass('active'); $(this).addClass('active');
-            tabla.column(2).search('').draw();
-        });
-        $('#btn-pendientes').on('click', function() {
-            $('.btn-group button').removeClass('active'); $(this).addClass('active');
-            tabla.column(2).search('PENDIENTE').draw();
-        });
-        $('#btn-conciliados').on('click', function() {
-            $('.btn-group button').removeClass('active'); $(this).addClass('active');
-            tabla.column(2).search('CONCILIADO').draw();
-        });
-    });
+    // FILTRADO INSTANTÁNEO EN MEMORIA (Compatible con jQuery o JavaScript Puro)
+    function filtrarEstado(estado, elemento) {
+        $('.btn-group button').removeClass('active');
+        $(elemento).addClass('active');
+
+        if (estado === 'TODOS') {
+            $('.movimiento-fila').show();
+        } else {
+            $('.movimiento-fila').hide();
+            $('.movimiento-fila[data-estado="' + estado + '"]').show();
+        }
+    }
 
     function prepararDevolucion(id, concepto, importe) {
         document.getElementById('dev_movimientoId').value = id;
         document.getElementById('dev_info_concepto').innerText = concepto;
-        document.getElementById('dev_info_importe').innerText = new Intl.NumberFormat('es-ES').format(Math.abs(importe)) + " €";
-        new bootstrap.Modal(document.getElementById('modalDevolucion')).show();
+        const numImporte = Math.abs(parseFloat(importe));
+        document.getElementById('dev_info_importe').innerText = new Intl.NumberFormat('es-ES').format(numImporte);
+    }
+
+    // --- CORRECCIÓN JAVASCRIPT PURO PARA EL BOTÓN EN CONSOLA ---
+    function toggleAllMovimientos(master) {
+        const checkboxes = document.querySelectorAll('.check-mov-id');
+        checkboxes.forEach(cb => {
+            if (cb.parentElement.parentElement.style.display !== 'none') {
+                cb.checked = master.checked;
+            }
+        });
+        actualizarSeleccionMulti();
+    }
+
+    function actualizarSeleccionMulti() {
+        const checkboxesChecked = document.querySelectorAll('.check-mov-id:checked');
+        const count = checkboxesChecked.length;
+
+        const btn = document.getElementById('btnConciliarMultiples');
+        const lbl = document.getElementById('lblCountChecked');
+        const masterCheck = document.getElementById('checkAllMovs');
+
+        if (count > 0) {
+            btn.classList.remove('d-none');
+            lbl.innerText = count;
+        } else {
+            btn.classList.add('d-none');
+            if(masterCheck) masterCheck.checked = false;
+        }
+    }
+
+    function abrirModalMultiConciliacion() {
+        const containerInputs = document.getElementById('hiddenMovInputs');
+        const containerLista = document.getElementById('divListaMovsSeleccionados');
+
+        containerInputs.innerHTML = '';
+        containerLista.innerHTML = '';
+
+        let totalSumado = 0;
+        const checkboxesChecked = document.querySelectorAll('.check-mov-id:checked');
+
+        checkboxesChecked.forEach(cb => {
+            const id = cb.value;
+            const importeRaw = parseFloat(cb.getAttribute('data-importe'));
+            const signo = cb.getAttribute('data-signo');
+            const concepto = cb.getAttribute('data-concepto');
+
+            const esNegativo = (signo === '1' || importeRaw < 0);
+            const importeReal = esNegativo ? -Math.abs(importeRaw) : Math.abs(importeRaw);
+
+            totalSumado += importeReal;
+
+            // Inyectamos input oculto
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'movimientoIds';
+            input.value = id;
+            containerInputs.appendChild(input);
+
+            // Pintamos la línea resumen
+            const colorClass = esNegativo ? 'text-danger' : 'text-success';
+            const prefijo = esNegativo ? '-' : '';
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'mb-1 border-bottom pb-1';
+            itemDiv.style.fontSize = '0.75rem';
+            itemDiv.innerHTML = '<span class="fw-bold ' + colorClass + '">' + prefijo + new Intl.NumberFormat('es-ES', {minimumFractionDigits: 2}).format(Math.abs(importeRaw)) + ' €</span>' +
+                '<span class="text-dark ms-1">' + concepto + '</span>';
+            containerLista.appendChild(itemDiv);
+        });
+
+        document.getElementById('spanTotalAgrupado').innerText = new Intl.NumberFormat('es-ES', {minimumFractionDigits: 2}).format(totalSumado);
+
+        // RESET COMPLETO DE RECIBOS AL REABRIR EL PANEL DE CONTROL
+        document.querySelectorAll('.check-recibo-id').forEach(cb => cb.checked = false);
+        actualizarSumaRecibosMarcados();
+
+        // Lanzamiento nativo del modal Bootstrap 5
+        const modalElement = new bootstrap.Modal(document.getElementById('modalConciliarMultiples'));
+        modalElement.show();
+    }
+
+    // --- NUEVO MOTOR DE CÓMPUTO EN TIEMPO REAL PARA RECIBOS MARCADOS ---
+    function actualizarSumaRecibosMarcados() {
+        const checkboxesRecibos = document.querySelectorAll('.check-recibo-id:checked');
+        let totalRecibos = 0;
+
+        checkboxesRecibos.forEach(cb => {
+            const importe = parseFloat(cb.getAttribute('data-importe')) || 0;
+            totalRecibos += importe;
+        });
+
+        // Estampar el sumatorio en el marcador dinámico secundario
+        document.getElementById('spanTotalRecibosMarcados').innerText = new Intl.NumberFormat('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(totalRecibos);
+
+        // Extraer y normalizar el valor de control del banco
+        const totalBancoRaw = document.getElementById('spanTotalAgrupado').innerText;
+        const totalBanco = parseFloat(totalBancoRaw.replace(/\./g, '').replace(',', '.')) || 0;
+
+        const cardTotal = document.getElementById('divCardTotalRecibos');
+
+        // Control de alertas por color dinámico (Saldado exacto, descuadre por exceso o por defecto)
+        if (totalRecibos.toFixed(2) === totalBanco.toFixed(2) && totalBanco !== 0) {
+            cardTotal.classList.remove('bg-secondary', 'bg-danger');
+            cardTotal.classList.add('bg-success'); // Cuadre perfecto: Verde
+        } else if (totalRecibos > totalBanco) {
+            cardTotal.classList.remove('bg-secondary', 'bg-success');
+            cardTotal.classList.add('bg-danger');  // Error por exceso: Rojo
+        } else {
+            cardTotal.classList.remove('bg-success', 'bg-danger');
+            cardTotal.classList.add('bg-secondary'); // Pendiente / Insuficiente: Gris neutro
+        }
     }
 </script>
+
+<div th:replace="~{layout :: scripts}"></div>
 </body>
 </html>

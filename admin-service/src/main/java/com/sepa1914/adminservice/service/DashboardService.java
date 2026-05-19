@@ -28,7 +28,7 @@ public class DashboardService {
      */
     public DashboardStats obtenerMetricas(Long comunidadId) {
         LocalDate ahora = LocalDate.now();
-        List<MovimientoBancario> todosLosMovimientos = movRepo.findByComunidadId(comunidadId);
+        List<MovimientoBancario> todosLosMovimientos = movRepo.findByComunidadIdOrderByFechaOperacionAsc(comunidadId);
 
         // 1. Calcular Ingresos del Mes (Signo 2 en Norma 43)
         BigDecimal ingresosMes = todosLosMovimientos.stream()

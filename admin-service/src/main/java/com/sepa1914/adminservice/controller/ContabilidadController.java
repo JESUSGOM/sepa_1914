@@ -49,32 +49,36 @@ public class ContabilidadController {
 
     private static final Logger log = LoggerFactory.getLogger(ContabilidadController.class);
 
-    @Autowired
-    private ContabilidadService contabilidadService;
 
-    @Autowired
-    private PdfService pdfService;
+    private final ContabilidadService contabilidadService;
+    private final PdfService pdfService;
+    private final ComunidadRepository comunidadRepository;
+    private final CuentaContableRepository cuentaContableRepository;
+    private final GastoRepository gastoRepository;
+    private final VecinoRepository vecinoRepository;
+    private final ReciboRepository reciboRepository;
+    private final MovimientoContableRepository movContableRepo;
+    private final MovimientoBancarioRepository movBancarioRepo;
 
-    @Autowired
-    private ComunidadRepository comunidadRepository;
-
-    @Autowired
-    private CuentaContableRepository cuentaContableRepository;
-
-    @Autowired
-    private GastoRepository gastoRepository;
-
-    @Autowired
-    private VecinoRepository vecinoRepository;
-
-    @Autowired
-    private ReciboRepository reciboRepository;
-
-    @Autowired
-    private MovimientoContableRepository movContableRepo;
-
-    @Autowired
-    private MovimientoBancarioRepository movBancarioRepo;
+    public ContabilidadController(ContabilidadService contabilidadService,
+                                  PdfService pdfService,
+                                  ComunidadRepository comunidadRepository,
+                                  CuentaContableRepository cuentaContableRepository,
+                                  GastoRepository gastoRepository,
+                                  VecinoRepository vecinoRepository,
+                                  ReciboRepository reciboRepository,
+                                  MovimientoContableRepository movContableRepo,
+                                  MovimientoBancarioRepository movBancarioRepo) {
+        this.contabilidadService = contabilidadService;
+        this.pdfService = pdfService;
+        this.comunidadRepository = comunidadRepository;
+        this.cuentaContableRepository = cuentaContableRepository;
+        this.gastoRepository = gastoRepository;
+        this.vecinoRepository = vecinoRepository;
+        this.reciboRepository = reciboRepository;
+        this.movContableRepo = movContableRepo;
+        this.movBancarioRepo = movBancarioRepo;
+    }
 
     // =========================================================================
     // 1. LIQUIDACIÓN, ANÁLISIS Y ESTADOS DE CUENTAS
@@ -283,7 +287,7 @@ public class ContabilidadController {
     public String verLibroDiario(@PathVariable Long comunidadId,
                                  @RequestParam(required = false) Integer ano,
                                  @RequestParam(defaultValue = "0") int page,
-                                 @RequestParam(defaultValue = "20") int size,
+                                 @RequestParam(defaultValue = "15") int size,
                                  Authentication auth, Model model) {
 
         validarPropiedadComunidad(comunidadId, auth);
@@ -344,9 +348,16 @@ public class ContabilidadController {
     /**
      * Genera el Libro Mayor con cálculo progresivo de saldo acumulado.
      */
+    /**
+     * Genera el Libro Mayor con rango de fechas flexible, buscador global y saldo anterior dinámico.
+     * MEJORA GTI: Filtra conceptos, importes, fechas y asientos sin perder la integridad del saldo acumulado.
+     */
     @GetMapping("/cuenta/mayor/{cuentaId}")
     public String verLibroMayor(@PathVariable Long cuentaId,
                                 @RequestParam(required = false) Integer ano,
+                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+                                @RequestParam(required = false) String buscar,
                                 @RequestParam(defaultValue = "0") int page,
                                 @RequestParam(defaultValue = "20") int size,
                                 Authentication auth, Model model) {
@@ -355,20 +366,68 @@ public class ContabilidadController {
         validarPropiedadComunidad(cuenta.getComunidad().getId(), auth);
 
         int ejercicio = (ano != null) ? ano : LocalDate.now().getYear();
-        log.debug("Cargando mayor de cuenta {} para el año {}", cuenta.getCodigo(), ejercicio);
 
-        List<MovimientoMayorDTO> todos = contabilidadService.obtenerLibroMayorConSaldo(cuentaId, ejercicio);
+        // Estrategia de asignación temporal GTI
+        LocalDate desde = (fechaDesde != null) ? fechaDesde : LocalDate.of(ejercicio, 1, 1);
+        LocalDate hasta = (fechaHasta != null) ? fechaHasta : LocalDate.of(ejercicio, 12, 31);
 
+        log.info("GTI LEDGER: Procesando mayor de cuenta {} entre {} y {} con filtro [{}]", cuenta.getCodigo(), desde, hasta, buscar);
+
+        // Cargamos el histórico completo de movimientos para procesar el arrastre de saldos
+        List<MovimientoContable> todosLosMovimientos = movContableRepo.findByCuentaIdOrderByFechaAsc(cuentaId);
+
+        List<MovimientoMayorDTO> filtrados = new ArrayList<>();
+        BigDecimal saldoAnterior = BigDecimal.ZERO;
+        BigDecimal currentSaldo = BigDecimal.ZERO;
+
+        for (MovimientoContable m : todosLosMovimientos) {
+            BigDecimal debe = m.getDebe() != null ? m.getDebe() : BigDecimal.ZERO;
+            BigDecimal haber = m.getHaber() != null ? m.getHaber() : BigDecimal.ZERO;
+
+            // Si el movimiento es anterior a la ventana de fechas, acumula en saldo anterior
+            if (m.getFecha().isBefore(desde)) {
+                saldoAnterior = saldoAnterior.add(debe).subtract(haber);
+            }
+
+            // El saldo acumulado en ese instante del tiempo histórico
+            currentSaldo = currentSaldo.add(debe).subtract(haber);
+
+            // Verificamos si entra en el marco temporal
+            if (!m.getFecha().isBefore(desde) && !m.getFecha().isAfter(hasta)) {
+                boolean coincide = true;
+
+                // Motor de filtrado de campos GTI (Concepto, Asiento, Fecha, Importes)
+                if (buscar != null && !buscar.isBlank()) {
+                    String bLower = buscar.toLowerCase();
+                    boolean conMatch = m.getConcepto() != null && m.getConcepto().toLowerCase().contains(bLower);
+                    boolean asMatch = m.getNumeroAsiento() != null && m.getNumeroAsiento().toLowerCase().contains(bLower);
+                    boolean fechaMatch = m.getFecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")).contains(buscar) || m.getFecha().toString().contains(buscar);
+                    boolean impMatch = debe.toString().contains(buscar) || haber.toString().contains(buscar);
+                    coincide = conMatch || asMatch || fechaMatch || impMatch;
+                }
+
+                if (coincide) {
+                    filtrados.add(new MovimientoMayorDTO(m.getFecha(), m.getConcepto(), m.getNumeroAsiento(), debe, haber, currentSaldo));
+                }
+            }
+        }
+
+        // Paginador en memoria RAM sobre resultados filtrados
         int fromIndex = page * size;
-        int toIndex = Math.min(fromIndex + size, todos.size());
+        int toIndex = Math.min(fromIndex + size, filtrados.size());
 
         model.addAttribute("cuenta", cuenta);
-        model.addAttribute("movimientos", fromIndex < todos.size() ? todos.subList(fromIndex, toIndex) : List.of());
+        model.addAttribute("movimientos", fromIndex < filtrados.size() ? filtrados.subList(fromIndex, toIndex) : List.of());
         model.addAttribute("ejercicio", ejercicio);
+        model.addAttribute("fechaDesde", desde);
+        model.addAttribute("fechaHasta", hasta);
+        model.addAttribute("searchTerm", buscar);
+        model.addAttribute("saldoAnterior", saldoAnterior);
         model.addAttribute("comunidad", cuenta.getComunidad());
         model.addAttribute("currentPage", page);
-        model.addAttribute("totalPages", (int) Math.ceil((double) todos.size() / size));
-        model.addAttribute("saldoFinalAnual", todos.isEmpty() ? BigDecimal.ZERO : todos.get(todos.size() - 1).saldoAcumulado());
+        model.addAttribute("totalPages", (int) Math.ceil((double) filtrados.size() / size));
+        model.addAttribute("totalItems", filtrados.size());
+        model.addAttribute("saldoFinalAnual", filtrados.isEmpty() ? saldoAnterior : filtrados.get(filtrados.size() - 1).saldoAcumulado());
         model.addAttribute("activePage", "extracto");
 
         return "contabilidad/cuenta-mayor";
@@ -380,14 +439,39 @@ public class ContabilidadController {
      * FIX 404: Mapeo solicitado por el menú lateral.
      */
     @GetMapping("/cuentas/lista/{comunidadId}")
-    public String listarCuentas(@PathVariable Long comunidadId, Authentication auth, Model model) {
+    public String listarCuentas(@PathVariable Long comunidadId,
+                                @RequestParam(value = "buscar", required = false) String buscar,
+                                @RequestParam(value = "page", defaultValue = "0") int page,
+                                @RequestParam(value = "size", defaultValue = "12") int size,
+                                @RequestParam(value = "sortField", defaultValue = "codigo") String sortField,
+                                @RequestParam(value = "sortDir", defaultValue = "asc") String sortDir,
+                                Authentication auth, Model model) {
         validarPropiedadComunidad(comunidadId, auth);
 
         Comunidad comunidad = comunidadRepository.findById(comunidadId).orElseThrow();
-        List<CuentaContable> cuentas = cuentaContableRepository.findByComunidadIdOrderByCodigoAsc(comunidadId);
+
+        // Configuración de ordenación dinámica
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortField).descending() : Sort.by(sortField).ascending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<CuentaContable> paginaCuentas;
+
+        // Desvío inteligente hacia motor de búsqueda o paginado general
+        if (buscar != null && !buscar.trim().isEmpty()) {
+            paginaCuentas = cuentaContableRepository.buscarPorComunidadYTexto(comunidadId, buscar, pageable);
+        } else {
+            paginaCuentas = cuentaContableRepository.findByComunidadId(comunidadId, pageable);
+        }
 
         model.addAttribute("comunidad", comunidad);
-        model.addAttribute("cuentas", cuentas);
+        model.addAttribute("cuentas", paginaCuentas.getContent());
+        model.addAttribute("currentPage", page);
+        model.addAttribute("totalPages", paginaCuentas.getTotalPages());
+        model.addAttribute("totalItems", paginaCuentas.getTotalElements());
+        model.addAttribute("searchTerm", buscar);
+        model.addAttribute("sortField", sortField);
+        model.addAttribute("sortDir", sortDir);
+        model.addAttribute("reverseSortDir", sortDir.equals("asc") ? "desc" : "asc");
+
         model.addAttribute("activePage", "extracto");
 
         return "contabilidad/cuentas-lista";
@@ -488,21 +572,27 @@ public class ContabilidadController {
     /**
      * Registra el saldo inicial de una cuenta para iniciar el año.
      */
-    @PostMapping("/guardar-apertura-tecnica")
-    public String guardarApertura(@RequestParam Long comunidadId,
-                                  @RequestParam Long cuentaId,
-                                  @RequestParam BigDecimal importe,
-                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
-                                  Authentication auth, RedirectAttributes ra) {
+    @PostMapping("/guardar-apertura")
+    public String guardarApertura(
+            @RequestParam Long comunidadId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam Long cuentaId,
+            @RequestParam BigDecimal importe,
+            RedirectAttributes ra) {
 
-        validarPropiedadComunidad(comunidadId, auth);
         try {
-            log.info("Generando asiento de apertura para comunidad {}", comunidadId);
-            contabilidadService.registrarSaldoInicial(cuentaId, importe, fecha);
-            ra.addFlashAttribute("mensaje", "Apertura técnica guardada correctamente.");
+            log.info("Registrando saldo inicial para comunidad ID: {} en cuenta ID: {}", comunidadId, cuentaId);
+
+            // Llamamos al servicio para que cree el asiento contable real
+            contabilidadService.crearAsientoAperturaManual(comunidadId, fecha, cuentaId, importe);
+
+            ra.addFlashAttribute("mensaje", "Asiento de apertura generado correctamente. Saldo inicial registrado.");
         } catch (Exception e) {
-            ra.addFlashAttribute("error", "Fallo al procesar apertura.");
+            log.error("Error al guardar apertura: {}", e.getMessage());
+            ra.addFlashAttribute("error", "Error al generar el asiento: " + e.getMessage());
         }
+
+        // Redirigimos al extracto bancario de esa comunidad para ver el resultado
         return "redirect:/bancos/movimientos/" + comunidadId;
     }
 
@@ -564,6 +654,38 @@ public class ContabilidadController {
             ra.addFlashAttribute("error", "Fallo al reiniciar el periodo.");
         }
         return "redirect:/comunidades/detalle/" + comunidadId;
+    }
+
+    /**
+     * Proceso de renumeración de asientos para mantener la correlatividad legal.
+     * FIX 404: Endpoint para la acción de renumerar asientos.
+     */
+    @PostMapping("/comunidades/{id}/renumerar-asientos")
+    public String renumerarAsientos(@PathVariable Long id,
+                                    @RequestParam(required = false) Integer ano,
+                                    Authentication auth,
+                                    RedirectAttributes ra) {
+
+        // Muro de seguridad GTI
+        validarPropiedadComunidad(id, auth);
+
+        // Si no se especifica año, usamos el ejercicio actual (2026)
+        int ejercicio = (ano != null) ? ano : LocalDate.now().getYear();
+
+        try {
+            log.info("GTI MAINTENANCE: Iniciando renumeración de asientos para comunidad {} - Ejercicio {}", id, ejercicio);
+
+            // Llamada al método existente en el Service
+            contabilidadService.renumerarAsientosEjercicio(id, ejercicio);
+
+            ra.addFlashAttribute("mensaje", "Renumeración de asientos completada con éxito para el ejercicio " + ejercicio + ".");
+        } catch (Exception e) {
+            log.error("Fallo en renumeración: {}", e.getMessage());
+            ra.addFlashAttribute("error", "No se pudo completar la renumeración de los asientos.");
+        }
+
+        // Redirigimos de vuelta al libro diario para ver el resultado
+        return "redirect:/contabilidad/diario/" + id;
     }
 
     // =========================================================================
@@ -781,5 +903,51 @@ public class ContabilidadController {
                 .orElseThrow(() -> new RuntimeException("Error: La cuenta 572 no está configurada."));
 
         return "redirect:/contabilidad/cuenta/mayor/" + banco.getId();
+    }
+
+    @GetMapping("/gastos/regenerar/{id}")
+    public String regenerarGastos(@PathVariable Long id, RedirectAttributes ra) {
+        try {
+            log.info("GTI Operación: Regenerando asientos de gastos para comunidad {}", id);
+            contabilidadService.regenerarAsientosGastos(id);
+            ra.addFlashAttribute("mensaje", "Sincronización completada: Se han generado los asientos de devengo (6 -> 4) para los gastos pendientes.");
+        } catch (Exception e) {
+            log.error("Error en regeneración: {}", e.getMessage());
+            ra.addFlashAttribute("error", "Error al regenerar asientos: " + e.getMessage());
+        }
+        return "redirect:/contabilidad/gastos/" + id;
+    }
+
+    /**
+     * CONCILIACIÓN MANUAL DIRECTA GTI: Vincula un apunte bancario directamente con una cuenta.
+     * PROTEGIDA: Evita errores 400 si faltan parámetros en el envío desde el front-end.
+     */
+    @PostMapping("/conciliar-manual-directo")
+    public String conciliarManualDirecto(@RequestParam(value = "movId", required = false) Long movId,
+                                         @RequestParam(value = "cuentaId", required = false) Long cuentaId,
+                                         @RequestParam(value = "comunidadId", required = false) Long comunidadId,
+                                         RedirectAttributes ra) {
+
+        // Si falta la Comunidad, volvemos a la lista general por seguridad
+        if (comunidadId == null) {
+            ra.addFlashAttribute("error", "Error: No se ha recibido el identificador de la comunidad.");
+            return "redirect:/comunidades/lista";
+        }
+
+        try {
+            if (movId == null || cuentaId == null) {
+                throw new RuntimeException("Parámetros insuficientes recibidos en el lote de conciliación directa.");
+            }
+
+            log.info("GTI LEDGER: Conciliando apunte ID {} con cuenta contable ID {}", movId, cuentaId);
+            contabilidadService.conciliarManualDirecto(movId, cuentaId);
+            ra.addFlashAttribute("mensaje", "¡Éxito! Movimiento bancario conciliado directamente con la cuenta seleccionada.");
+
+        } catch (Exception e) {
+            log.error("Fallo en conciliación manual directa: {}", e.getMessage());
+            ra.addFlashAttribute("error", "No se pudo realizar la conciliación: " + e.getMessage());
+        }
+
+        return "redirect:/bancos/movimientos/" + comunidadId;
     }
 }
