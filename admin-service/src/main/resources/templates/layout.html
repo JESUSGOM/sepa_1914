@@ -286,6 +286,13 @@
             <div class="sidebar-heading mt-3">Configuración</div>
             <ul class="nav flex-column">
                 <li class="nav-item">
+                    <a class="nav-link text-white" th:href="@{/cuentas-presentador}"
+                       th:classappend="${activePage == 'cuentas-presentador' ? 'active' : ''}">
+                        <i class="bi bi-bank2"></i> Cuentas Presentador
+                    </a>
+                </li>
+
+                <li class="nav-item">
                     <a class="nav-link text-white" th:href="@{/rutas/archivos}"
                        th:classappend="${activePage == 'rutas' ? 'active' : ''}">
                         <i class="bi bi-folder"></i> Rutas Archivos

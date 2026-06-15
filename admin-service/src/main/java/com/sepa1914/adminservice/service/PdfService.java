@@ -107,7 +107,16 @@ public class PdfService {
                 String cif = com.getIdentificadorAcreedor();
                 if (cif != null) {
                     try {
-                        File logoFile = new File(storageLocation + File.separator + "logos" + File.separator + cif + ".png");
+                        String basePath = System.getProperty("user.dir");
+
+                        File logoFile = new File(
+                                basePath
+                                        + File.separator
+                                        + "logos"
+                                        + File.separator
+                                        + cif
+                                        + ".png"
+                        );
                         if (logoFile.exists()) {
                             byte[] logoBytes = Files.readAllBytes(logoFile.toPath());
                             String base64Logo = Base64.getEncoder().encodeToString(logoBytes);
@@ -516,8 +525,18 @@ public class PdfService {
         try {
             byte[] pdfBytes = generarMandatoSepa(comunidad, vecino);
 
-            String nombreCarpetaComunidad = normalizarParaFichero(comunidad.getNombre());
-            java.io.File carpetaComunidad = new java.io.File(storageLocation + java.io.File.separator + nombreCarpetaComunidad);
+            String basePath = System.getProperty("user.dir");
+
+            String nombreCarpetaComunidad =
+                    normalizarParaFichero(comunidad.getNombre());
+
+            java.io.File carpetaComunidad = new java.io.File(
+                    basePath
+                            + java.io.File.separator
+                            + "mandatos"
+                            + java.io.File.separator
+                            + nombreCarpetaComunidad
+            );
 
             if (!carpetaComunidad.exists() && carpetaComunidad.mkdirs()) {
                 log.info("GTI FS: Creada nueva carpeta para comunidad: {}", nombreCarpetaComunidad);

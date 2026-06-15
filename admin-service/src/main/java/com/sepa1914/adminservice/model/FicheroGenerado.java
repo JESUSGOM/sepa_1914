@@ -31,6 +31,28 @@ public class FicheroGenerado {
     @Column(name = "nombre_archivo")
     private String nombreArchivo;
 
+    @Column(name = "estado", length = 30, nullable = false)
+    private String estado = "GENERADA";
+
+    @Column(name = "tipo_remesa", length = 30)
+    private String tipoRemesa = "ORDINARIA";
+
+    @Column(name = "fecha_cobro")
+    private LocalDate fechaCobro;
+
+    @Column(name = "esquema_sepa", length = 10)
+    private String esquemaSepa = "CORE";
+
+    @Column(name = "total_domiciliado", precision = 17, scale = 2)
+    private BigDecimal totalDomiciliado = BigDecimal.ZERO;
+
+    @Column(name = "total_no_domiciliado", precision = 17, scale = 2)
+    private BigDecimal totalNoDomiciliado = BigDecimal.ZERO;
+
+    @Lob
+    @Column(name = "observaciones", columnDefinition = "TEXT")
+    private String observaciones;
+
     @Lob
     @Column(name = "contenido", columnDefinition = "LONGTEXT")
     private String contenido;
@@ -54,6 +76,20 @@ public class FicheroGenerado {
     public void setNumeroRecibos(Integer numeroRecibos) { this.numeroRecibos = numeroRecibos; }
     public String getNombreArchivo() { return nombreArchivo; }
     public void setNombreArchivo(String nombreArchivo) { this.nombreArchivo = nombreArchivo; }
+    public String getEstado() { return estado; }
+    public void setEstado(String estado) { this.estado = estado; }
+    public String getTipoRemesa() { return tipoRemesa; }
+    public void setTipoRemesa(String tipoRemesa) { this.tipoRemesa = tipoRemesa; }
+    public LocalDate getFechaCobro() { return fechaCobro; }
+    public void setFechaCobro(LocalDate fechaCobro) { this.fechaCobro = fechaCobro; }
+    public String getEsquemaSepa() { return esquemaSepa; }
+    public void setEsquemaSepa(String esquemaSepa) { this.esquemaSepa = esquemaSepa; }
+    public BigDecimal getTotalDomiciliado() { return totalDomiciliado; }
+    public void setTotalDomiciliado(BigDecimal totalDomiciliado) { this.totalDomiciliado = totalDomiciliado; }
+    public BigDecimal getTotalNoDomiciliado() { return totalNoDomiciliado; }
+    public void setTotalNoDomiciliado(BigDecimal totalNoDomiciliado) { this.totalNoDomiciliado = totalNoDomiciliado; }
+    public String getObservaciones() { return observaciones; }
+    public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
     public String getContenido() { return contenido; }
     public void setContenido(String contenido) { this.contenido = contenido; }
 }

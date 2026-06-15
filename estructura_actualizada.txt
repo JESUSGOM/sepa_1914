@@ -1,0 +1,539 @@
+Listado de rutas de carpetas para el volumen Elements
+El número de serie del volumen es AC74-A1CD
+W:.
+|   .gitignore
+|   estructura_actualizada.txt
+|   lista-mfi-es.ods
+|   lista-proyecto.txt
+|   lista.txt
+|   pom.xml
+|   sepa-1914-parent.iml
+|   sepa-1914-parent.ipr
+|   sepa-1914-parent.iws
+|   vamos a grabar esta conversación con el titulo sepa 1914.docx
+|   
++---.github
+|   |   copilot-instructions.md
+|   |   git-commit-instructions.md
+|   |   
+|   \---workflows
+|           maven-build.yml
+|           
++---.idea
+|   |   .gitignore
+|   |   compiler.xml
+|   |   copilot.data.migration.agent.xml
+|   |   dataSources.local.xml
+|   |   dataSources.xml
+|   |   encodings.xml
+|   |   jarRepositories.xml
+|   |   misc.xml
+|   |   modules.xml
+|   |   vcs.xml
+|   |   workspace.xml
+|   |   
+|   +---codeStyles
+|   |       codeStyleConfig.xml
+|   |       
+|   \---dataSources
+|       |   b4c3cd8e-de41-4b1e-9df8-9da55838d09a.xml
+|       |   
+|       \---b4c3cd8e-de41-4b1e-9df8-9da55838d09a
+|           \---storage_v2
+|               \---_src_
+|                   \---schema
+|                           information_schema.FNRwLQ.meta
+|                           performance_schema.kIw0nw.meta
+|                           
+\---admin-service
+    |   .gitattributes
+    |   .gitignore
+    |   admin-service.iml
+    |   HELP.md
+    |   mvnw
+    |   mvnw.cmd
+    |   pom.xml
+    |   
+    +---.mvn
+    |   \---wrapper
+    |           maven-wrapper.properties
+    |           
+    +---src
+    |   +---main
+    |   |   +---java
+    |   |   |   \---com
+    |   |   |       \---sepa1914
+    |   |   |           \---adminservice
+    |   |   |               |   AdminServiceApplication.java
+    |   |   |               |   
+    |   |   |               +---api
+    |   |   |               |   \---auth
+    |   |   |               |           AuthController.java
+    |   |   |               |           LoginRequest.java
+    |   |   |               |           LoginResponse.java
+    |   |   |               |           
+    |   |   |               +---config
+    |   |   |               |       GlobalControllerAdvice.java
+    |   |   |               |       SecurityConfig.java
+    |   |   |               |       UserLoggingFilter.java
+    |   |   |               |       WebSocketConfig.java
+    |   |   |               |       
+    |   |   |               +---controller
+    |   |   |               |       ActaController.java
+    |   |   |               |       BancosController.java
+    |   |   |               |       ComunidadController.java
+    |   |   |               |       ConceptoController.java
+    |   |   |               |       ConciliacionController.java
+    |   |   |               |       ConfiguracionController.java
+    |   |   |               |       ContabilidadController.java
+    |   |   |               |       GastoController.java
+    |   |   |               |       HomeController.java
+    |   |   |               |       IncidenciaController.java
+    |   |   |               |       InformesController.java
+    |   |   |               |       LoginController.java
+    |   |   |               |       PresupuestoController.java
+    |   |   |               |       ReciboController.java
+    |   |   |               |       RemesaController.java
+    |   |   |               |       UsuarioController.java
+    |   |   |               |       VecinoController.java
+    |   |   |               |       
+    |   |   |               +---dto
+    |   |   |               |       BalanceComprobacionDTO.java
+    |   |   |               |       BalanceSituacion.java
+    |   |   |               |       DashboardStats.java
+    |   |   |               |       DesviacionPresupuestoDTO.java
+    |   |   |               |       GastoDTO.java
+    |   |   |               |       IncidenciaDTO.java
+    |   |   |               |       IncidenciaReport.java
+    |   |   |               |       MorosoInfo.java
+    |   |   |               |       MovimientoMayorDTO.java
+    |   |   |               |       PresupuestoFormRecord.java
+    |   |   |               |       PresupuestoLineaRecord.java
+    |   |   |               |       
+    |   |   |               +---model
+    |   |   |               |       Acta.java
+    |   |   |               |       Administrador.java
+    |   |   |               |       Comunidad.java
+    |   |   |               |       ConceptoCobro.java
+    |   |   |               |       ConfiguracionRutas.java
+    |   |   |               |       CuentaContable.java
+    |   |   |               |       EstadoActa.java
+    |   |   |               |       EstadoRecibo.java
+    |   |   |               |       FicheroGenerado.java
+    |   |   |               |       Gasto.java
+    |   |   |               |       Incidencia.java
+    |   |   |               |       LicenciaMaestra.java
+    |   |   |               |       MovimientoBancario.java
+    |   |   |               |       MovimientoContable.java
+    |   |   |               |       Perdiodicidad.java
+    |   |   |               |       Presupuesto.java
+    |   |   |               |       Recibo.java
+    |   |   |               |       Rol.java
+    |   |   |               |       SepaUtils.java
+    |   |   |               |       TipoCuenta.java
+    |   |   |               |       TipoImpuesto.java
+    |   |   |               |       TipoReparto.java
+    |   |   |               |       Usuario.java
+    |   |   |               |       Vecino.java
+    |   |   |               |       
+    |   |   |               +---repository
+    |   |   |               |       ActaRepository.java
+    |   |   |               |       ComunidadRepository.java
+    |   |   |               |       ConceptoCobroRepository.java
+    |   |   |               |       ConfiguracionRutasRepository.java
+    |   |   |               |       CuentaContableRepository.java
+    |   |   |               |       FicheroGeneradoRepository.java
+    |   |   |               |       GastoRepository.java
+    |   |   |               |       IncidenciaRepository.java
+    |   |   |               |       LicenciaMaestraRepository.java
+    |   |   |               |       MovimientoBancarioRepository.java
+    |   |   |               |       MovimientoContableRepository.java
+    |   |   |               |       PresupuestoRepository.java
+    |   |   |               |       ReciboRepository.java
+    |   |   |               |       RolRepository.java
+    |   |   |               |       UsuarioRepository.java
+    |   |   |               |       VecinoRepository.java
+    |   |   |               |       
+    |   |   |               +---service
+    |   |   |               |       BankService.java
+    |   |   |               |       ConciliacionService.java
+    |   |   |               |       ContabilidadService.java
+    |   |   |               |       DashboardService.java
+    |   |   |               |       EmailService.java
+    |   |   |               |       FileStorageService.java
+    |   |   |               |       IncidenciaBuzonService.java
+    |   |   |               |       InvoiceScannerService.java
+    |   |   |               |       LicenseService.java
+    |   |   |               |       MorosidadService.java
+    |   |   |               |       Norma43Service.java
+    |   |   |               |       PdfActaService.java
+    |   |   |               |       PdfService.java
+    |   |   |               |       PresupuestoService.java
+    |   |   |               |       QrPdfService.java
+    |   |   |               |       ReciboService.java
+    |   |   |               |       SepaService.java
+    |   |   |               |       SepaTestService.java
+    |   |   |               |       SepaValidatorService.java
+    |   |   |               |       StorageService.java
+    |   |   |               |       UserDetailsServiceImpl.java
+    |   |   |               |       
+    |   |   |               \---util
+    |   |   |                       AesEncryptor.java
+    |   |   |                       CryptoUtil.java
+    |   |   |                       EncryptionUtil.java
+    |   |   |                       HardwareUtil.java
+    |   |   |                       
+    |   |   \---resources
+    |   |       |   application.properties
+    |   |       |   banner.txt
+    |   |       |   logback-spring.xml
+    |   |       |   
+    |   |       +---static
+    |   |       |   \---images
+    |   |       |           logo.jpg
+    |   |       |           logo.png
+    |   |       |           
+    |   |       \---templates
+    |   |           |   actas-formulario.html
+    |   |           |   actas-lista.html
+    |   |           |   bancos-conciliar.html
+    |   |           |   bancos-importar.html
+    |   |           |   bancos-lista.html
+    |   |           |   comunidades-detalle.html
+    |   |           |   comunidades-formulario.html
+    |   |           |   comunidades-lista.html
+    |   |           |   conceptos-maestro.html
+    |   |           |   conceptos-vecino.html
+    |   |           |   contabilidad-apertura.html
+    |   |           |   dashboard.html
+    |   |           |   incidencia-gestion.html
+    |   |           |   incidencias-lista.html
+    |   |           |   layout.html
+    |   |           |   login.html
+    |   |           |   morosidad-lista.html
+    |   |           |   registro.html
+    |   |           |   remesas-historial.html
+    |   |           |   vecinos-formulario.html
+    |   |           |   vecinos-lista.html
+    |   |           |   
+    |   |           +---configuracion
+    |   |           |       rutas-form.html
+    |   |           |       
+    |   |           +---contabilidad
+    |   |           |       balance-comprobacion.html
+    |   |           |       balance.html
+    |   |           |       cuenta-extracto.html
+    |   |           |       cuenta-mayor.html
+    |   |           |       cuentas-lista.html
+    |   |           |       estado-liquidacion.html
+    |   |           |       gasto-form.html
+    |   |           |       gastos-lista.html
+    |   |           |       libro-diario.html
+    |   |           |       presupuesto-form.html
+    |   |           |       recibos-lista.html
+    |   |           |       seleccionar-convocatoria-pdf.html
+    |   |           |       seleccionar-liquidacion-pdf.html
+    |   |           |       seleccionar-vecino-pdf.html
+    |   |           |       
+    |   |           \---pdf
+    |   |                   certificado-deudas.html
+    |   |                   convocatoria-junta.html
+    |   |                   estado-cuentas.html
+    |   |                   liquidacion-individual.html
+    |   |                   recibo-template.html
+    |   |                   
+    |   \---test
+    |       \---java
+    |           \---com
+    |               \---sepa1914
+    |                   \---adminservice
+    |                       |   AdminServiceApplicationTests.java
+    |                       |   
+    |                       +---config
+    |                       |       SecurityConfigTest.java
+    |                       |       
+    |                       +---service
+    |                       |       ConciliacionServiceIntegrationTest.java
+    |                       |       ConciliacionServiceTest.java
+    |                       |       EmailServiceTest.java
+    |                       |       LicenseServiceTest.java
+    |                       |       Norma43ServiceTest.java
+    |                       |       SepaValidatorServiceTest.java
+    |                       |       
+    |                       \---util
+    |                               CriptoYHardwareUnitTest.java
+    |                               
+    \---target
+        |   Gombeth-Urban.jar
+        |   Gombeth-Urban.jar.original
+        |   
+        +---classes
+        |   |   application.properties
+        |   |   banner.txt
+        |   |   logback-spring.xml
+        |   |   
+        |   +---com
+        |   |   \---sepa1914
+        |   |       \---adminservice
+        |   |           |   AdminServiceApplication.class
+        |   |           |   
+        |   |           +---api
+        |   |           |   \---auth
+        |   |           |           AuthController.class
+        |   |           |           LoginRequest.class
+        |   |           |           LoginResponse.class
+        |   |           |           
+        |   |           +---config
+        |   |           |       GlobalControllerAdvice.class
+        |   |           |       SecurityConfig.class
+        |   |           |       UserLoggingFilter.class
+        |   |           |       WebSocketConfig.class
+        |   |           |       
+        |   |           +---controller
+        |   |           |       ActaController.class
+        |   |           |       BancosController.class
+        |   |           |       ComunidadController.class
+        |   |           |       ConceptoController.class
+        |   |           |       ConciliacionController.class
+        |   |           |       ConfiguracionController.class
+        |   |           |       ContabilidadController.class
+        |   |           |       GastoController.class
+        |   |           |       HomeController.class
+        |   |           |       IncidenciaController.class
+        |   |           |       InformesController.class
+        |   |           |       LoginController.class
+        |   |           |       PresupuestoController.class
+        |   |           |       ReciboController.class
+        |   |           |       RemesaController.class
+        |   |           |       UsuarioController.class
+        |   |           |       VecinoController.class
+        |   |           |       
+        |   |           +---dto
+        |   |           |       BalanceComprobacionDTO.class
+        |   |           |       BalanceSituacion.class
+        |   |           |       DashboardStats.class
+        |   |           |       DesviacionPresupuestoDTO.class
+        |   |           |       GastoDTO.class
+        |   |           |       IncidenciaDTO.class
+        |   |           |       IncidenciaReport.class
+        |   |           |       MorosoInfo.class
+        |   |           |       MovimientoMayorDTO.class
+        |   |           |       PresupuestoFormRecord.class
+        |   |           |       PresupuestoLineaRecord.class
+        |   |           |       
+        |   |           +---model
+        |   |           |       Acta.class
+        |   |           |       Administrador.class
+        |   |           |       Comunidad.class
+        |   |           |       ConceptoCobro$Periodicidad.class
+        |   |           |       ConceptoCobro.class
+        |   |           |       ConfiguracionRutas.class
+        |   |           |       CuentaContable.class
+        |   |           |       EstadoActa.class
+        |   |           |       EstadoRecibo.class
+        |   |           |       FicheroGenerado.class
+        |   |           |       Gasto.class
+        |   |           |       Incidencia$EstadoIncidencia.class
+        |   |           |       Incidencia$Prioridad.class
+        |   |           |       Incidencia.class
+        |   |           |       LicenciaMaestra.class
+        |   |           |       MovimientoBancario.class
+        |   |           |       MovimientoContable.class
+        |   |           |       Perdiodicidad.class
+        |   |           |       Presupuesto.class
+        |   |           |       Recibo$EstadoRecibo.class
+        |   |           |       Recibo.class
+        |   |           |       Rol.class
+        |   |           |       SepaUtils.class
+        |   |           |       TipoCuenta.class
+        |   |           |       TipoImpuesto.class
+        |   |           |       TipoReparto.class
+        |   |           |       Usuario.class
+        |   |           |       Vecino.class
+        |   |           |       
+        |   |           +---repository
+        |   |           |       ActaRepository.class
+        |   |           |       ComunidadRepository.class
+        |   |           |       ConceptoCobroRepository.class
+        |   |           |       ConfiguracionRutasRepository.class
+        |   |           |       CuentaContableRepository.class
+        |   |           |       FicheroGeneradoRepository.class
+        |   |           |       GastoRepository.class
+        |   |           |       IncidenciaRepository.class
+        |   |           |       LicenciaMaestraRepository.class
+        |   |           |       MovimientoBancarioRepository.class
+        |   |           |       MovimientoContableRepository.class
+        |   |           |       PresupuestoRepository.class
+        |   |           |       ReciboRepository.class
+        |   |           |       RolRepository.class
+        |   |           |       UsuarioRepository.class
+        |   |           |       VecinoRepository.class
+        |   |           |       
+        |   |           +---service
+        |   |           |       BankService$DatosBanco.class
+        |   |           |       BankService.class
+        |   |           |       ConciliacionService.class
+        |   |           |       ContabilidadService$1.class
+        |   |           |       ContabilidadService.class
+        |   |           |       DashboardService.class
+        |   |           |       EmailService.class
+        |   |           |       FileStorageService.class
+        |   |           |       IncidenciaBuzonService.class
+        |   |           |       InvoiceScannerService.class
+        |   |           |       LicenseService.class
+        |   |           |       MorosidadService.class
+        |   |           |       Norma43Service.class
+        |   |           |       PdfActaService.class
+        |   |           |       PdfService.class
+        |   |           |       PresupuestoService.class
+        |   |           |       QrPdfService.class
+        |   |           |       ReciboService.class
+        |   |           |       SepaService$LineaRemesaDTO.class
+        |   |           |       SepaService.class
+        |   |           |       SepaTestService.class
+        |   |           |       SepaValidatorService.class
+        |   |           |       StorageService.class
+        |   |           |       UserDetailsServiceImpl.class
+        |   |           |       
+        |   |           \---util
+        |   |                   AesEncryptor.class
+        |   |                   CryptoUtil.class
+        |   |                   EncryptionUtil.class
+        |   |                   HardwareUtil.class
+        |   |                   
+        |   +---static
+        |   |   \---images
+        |   |           logo.jpg
+        |   |           logo.png
+        |   |           
+        |   \---templates
+        |       |   actas-formulario.html
+        |       |   actas-lista.html
+        |       |   bancos-conciliar.html
+        |       |   bancos-importar.html
+        |       |   bancos-lista.html
+        |       |   comunidades-detalle.html
+        |       |   comunidades-formulario.html
+        |       |   comunidades-lista.html
+        |       |   conceptos-maestro.html
+        |       |   conceptos-vecino.html
+        |       |   contabilidad-apertura.html
+        |       |   dashboard.html
+        |       |   incidencia-gestion.html
+        |       |   incidencias-lista.html
+        |       |   layout.html
+        |       |   login.html
+        |       |   morosidad-lista.html
+        |       |   registro.html
+        |       |   remesas-historial.html
+        |       |   vecinos-formulario.html
+        |       |   vecinos-lista.html
+        |       |   
+        |       +---configuracion
+        |       |       rutas-form.html
+        |       |       
+        |       +---contabilidad
+        |       |       balance-comprobacion.html
+        |       |       balance.html
+        |       |       cuenta-extracto.html
+        |       |       cuenta-mayor.html
+        |       |       cuentas-lista.html
+        |       |       estado-liquidacion.html
+        |       |       gasto-form.html
+        |       |       gastos-lista.html
+        |       |       libro-diario.html
+        |       |       presupuesto-form.html
+        |       |       recibos-lista.html
+        |       |       seleccionar-convocatoria-pdf.html
+        |       |       seleccionar-liquidacion-pdf.html
+        |       |       seleccionar-vecino-pdf.html
+        |       |       
+        |       \---pdf
+        |               certificado-deudas.html
+        |               convocatoria-junta.html
+        |               estado-cuentas.html
+        |               liquidacion-individual.html
+        |               recibo-template.html
+        |               
+        +---generated-sources
+        |   \---annotations
+        +---generated-test-sources
+        |   \---test-annotations
+        +---maven-archiver
+        |       pom.properties
+        |       
+        +---maven-status
+        |   \---maven-compiler-plugin
+        |       +---compile
+        |       |   \---default-compile
+        |       |           createdFiles.lst
+        |       |           inputFiles.lst
+        |       |           
+        |       \---testCompile
+        |           \---default-testCompile
+        |                   createdFiles.lst
+        |                   inputFiles.lst
+        |                   
+        +---surefire-reports
+        |       2026-05-19T14-56-23_570.dumpstream
+        |       2026-05-19T18-51-19_640.dumpstream
+        |       2026-05-19T19-04-55_986.dumpstream
+        |       2026-05-19T19-09-30_198.dumpstream
+        |       2026-05-19T19-12-23_550.dumpstream
+        |       2026-05-19T19-17-20_690.dumpstream
+        |       2026-05-19T19-21-50_200.dumpstream
+        |       2026-05-19T19-32-00_689.dumpstream
+        |       2026-05-19T19-34-50_990.dumpstream
+        |       2026-05-19T19-44-42_656.dumpstream
+        |       2026-05-19T19-55-56_266.dumpstream
+        |       2026-05-19T20-01-06_184.dumpstream
+        |       2026-05-19T20-06-47_355.dumpstream
+        |       2026-05-19T20-18-29_288.dumpstream
+        |       2026-05-19T20-25-58_871.dumpstream
+        |       2026-05-19T20-38-40_274.dumpstream
+        |       2026-05-19T20-43-31_869.dumpstream
+        |       2026-05-19T20-48-25_205.dumpstream
+        |       2026-05-19T20-53-28_707.dumpstream
+        |       2026-05-19T21-11-46_511.dumpstream
+        |       2026-05-19T21-19-46_862.dumpstream
+        |       2026-05-19T21-28-15_868.dumpstream
+        |       2026-05-19T21-33-54_741.dumpstream
+        |       com.sepa1914.adminservice.AdminServiceApplicationTests.txt
+        |       com.sepa1914.adminservice.config.SecurityConfigTest.txt
+        |       com.sepa1914.adminservice.service.ConciliacionServiceIntegrationTest.txt
+        |       com.sepa1914.adminservice.service.ConciliacionServiceTest.txt
+        |       com.sepa1914.adminservice.service.EmailServiceTest.txt
+        |       com.sepa1914.adminservice.service.LicenseServiceTest.txt
+        |       com.sepa1914.adminservice.service.Norma43ServiceTest.txt
+        |       com.sepa1914.adminservice.service.SepaValidatorServiceTest.txt
+        |       com.sepa1914.adminservice.util.CriptoYHardwareUnitTest.txt
+        |       TEST-com.sepa1914.adminservice.AdminServiceApplicationTests.xml
+        |       TEST-com.sepa1914.adminservice.config.SecurityConfigTest.xml
+        |       TEST-com.sepa1914.adminservice.service.ConciliacionServiceIntegrationTest.xml
+        |       TEST-com.sepa1914.adminservice.service.ConciliacionServiceTest.xml
+        |       TEST-com.sepa1914.adminservice.service.EmailServiceTest.xml
+        |       TEST-com.sepa1914.adminservice.service.LicenseServiceTest.xml
+        |       TEST-com.sepa1914.adminservice.service.Norma43ServiceTest.xml
+        |       TEST-com.sepa1914.adminservice.service.SepaValidatorServiceTest.xml
+        |       TEST-com.sepa1914.adminservice.util.CriptoYHardwareUnitTest.xml
+        |       
+        \---test-classes
+            \---com
+                \---sepa1914
+                    \---adminservice
+                        |   AdminServiceApplicationTests.class
+                        |   
+                        +---config
+                        |       SecurityConfigTest.class
+                        |       
+                        +---service
+                        |       ConciliacionServiceIntegrationTest.class
+                        |       ConciliacionServiceTest.class
+                        |       EmailServiceTest.class
+                        |       LicenseServiceTest.class
+                        |       Norma43ServiceTest.class
+                        |       SepaValidatorServiceTest.class
+                        |       
+                        \---util
+                                CriptoYHardwareUnitTest.class
+                                

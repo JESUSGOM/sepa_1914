@@ -26,7 +26,12 @@ public class PdfActaService {
     private String baseStorage;
 
     // 🛡️ Ajusta estas rutas a tu realidad
-    private final String certPath = "C:/sepa1914/certificados/CertificadoJesus.p12";
+    private final String certPath =
+            Paths.get(
+                    System.getProperty("user.dir"),
+                    "certificados",
+                    "CertificadoJesus.p12"
+            ).toString();
     private final String certPassword = "1801";
 
     public String generarPdfActa(Acta acta) throws Exception {

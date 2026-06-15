@@ -15,7 +15,7 @@ public class StorageService {
     public String guardarArchivo(MultipartFile archivo, String nifVecino) throws IOException {
         if (archivo.isEmpty()) throw new IOException("Archivo vacío");
 
-        Path root = Paths.get(storageLocation);
+        Path root = Paths.get(System.getProperty("user.dir"), "ficheros");
         if (!Files.exists(root)) Files.createDirectories(root);
 
         // Nombre único: NIF_timestamp_nombreOriginal

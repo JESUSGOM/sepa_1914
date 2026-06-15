@@ -3,7 +3,6 @@ package com.sepa1914.adminservice.controller;
 import com.sepa1914.adminservice.model.*;
 import com.sepa1914.adminservice.repository.*;
 import com.sepa1914.adminservice.service.*;
-import com.sepa1914.adminservice.util.EncryptionUtil;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,12 +16,12 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -45,14 +44,22 @@ public class ComunidadController {
     private final FicheroGeneradoRepository ficheroRepository;
     private final LicenseService licenseService;
     private final QrPdfService qrPdfService;
+    private final CuentaPresentadorService cuentaPresentadorService;
+    private final SepaXmlService sepaXmlService;
 
-    public ComunidadController(ComunidadRepository comunidadRepository, UsuarioRepository usuarioRepository,
-                               VecinoRepository vecinoRepository, SepaService sepaService,
-                               PdfService pdfService, FileStorageService fileStorageService,
+    public ComunidadController(ComunidadRepository comunidadRepository,
+                               UsuarioRepository usuarioRepository,
+                               VecinoRepository vecinoRepository,
+                               SepaService sepaService,
+                               PdfService pdfService,
+                               FileStorageService fileStorageService,
                                ConfiguracionRutasRepository configuracionRutasRepository,
                                ContabilidadService contabilidadService,
                                FicheroGeneradoRepository ficheroRepository,
-                               LicenseService licenseService, QrPdfService qrPdfService) {
+                               LicenseService licenseService,
+                               QrPdfService qrPdfService,
+                               CuentaPresentadorService cuentaPresentadorService,
+                               SepaXmlService sepaXmlService) {
         this.comunidadRepository = comunidadRepository;
         this.usuarioRepository = usuarioRepository;
         this.vecinoRepository = vecinoRepository;
@@ -64,6 +71,8 @@ public class ComunidadController {
         this.ficheroRepository = ficheroRepository;
         this.licenseService = licenseService;
         this.qrPdfService = qrPdfService;
+        this.cuentaPresentadorService = cuentaPresentadorService;
+        this.sepaXmlService = sepaXmlService;
     }
 
     @GetMapping("/lista")
@@ -82,14 +91,17 @@ public class ComunidadController {
         int pageNum = (page == null) ? 0 : page;
         int pageSize = (size == null) ? 5 : size;
 
-        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortField).descending() : Sort.by(sortField).ascending();
+        Sort sort = sortDir.equalsIgnoreCase("desc")
+                ? Sort.by(sortField).descending()
+                : Sort.by(sortField).ascending();
+
         Pageable pageable = PageRequest.of(pageNum, pageSize, sort);
         Page<Comunidad> paginaComunidades;
 
         if (buscar != null && !buscar.trim().isEmpty()) {
-            paginaComunidades = comunidadRepository.buscarPorAdminYTexto(actual, buscar, pageable);
+            paginaComunidades = comunidadRepository.buscarAccesiblesPorUsuarioYTexto(actual, buscar, pageable);
         } else {
-            paginaComunidades = comunidadRepository.findByAdministrador(actual, pageable);
+            paginaComunidades = comunidadRepository.findAccesiblesPorUsuario(actual, pageable);
         }
 
         model.addAttribute("activePage", "comunidades");
@@ -102,6 +114,8 @@ public class ComunidadController {
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortDir", sortDir);
         model.addAttribute("reverseSortDir", sortDir.equals("asc") ? "desc" : "asc");
+        model.addAttribute("cuentasPresentador",
+                cuentaPresentadorService.obtenerActivasAdministrador(actual.getId()));
 
         return "comunidades-lista";
     }
@@ -116,9 +130,13 @@ public class ComunidadController {
     @GetMapping("/editar/{id}")
     public String editarComunidad(@PathVariable Long id, Model model, Authentication auth) {
         Usuario actual = getUsuarioLogueado(auth);
-        Comunidad comunidad = comunidadRepository.findById(id)
-                .filter(c -> c.getAdministrador().getId().equals(actual.getId()))
+
+        Comunidad comunidad = comunidadRepository.findAccesiblesPorUsuario(actual)
+                .stream()
+                .filter(c -> c.getId().equals(id))
+                .findFirst()
                 .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
+
         model.addAttribute("comunidad", comunidad);
         model.addAttribute("activePage", "comunidades");
         return "comunidades-formulario";
@@ -127,9 +145,12 @@ public class ComunidadController {
     @GetMapping("/detalle/{id}")
     public String detalleComunidad(@PathVariable Long id, Model model, Authentication auth) {
         Usuario actual = getUsuarioLogueado(auth);
-        Comunidad comunidad = comunidadRepository.findById(id)
-                .filter(c -> c.getAdministrador().getId().equals(actual.getId()))
-                .orElseThrow(() -> new RuntimeException("Sin permisos o comunidad no encontrada"));
+
+        Comunidad comunidad = comunidadRepository.findAccesiblesPorUsuario(actual)
+                .stream()
+                .filter(c -> c.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
 
         List<Vecino> vecinos = vecinoRepository.findByComunidad(comunidad);
 
@@ -140,59 +161,80 @@ public class ComunidadController {
     }
 
     @GetMapping("/seleccionar/{id}")
-    public String seleccionarComunidad(@PathVariable Long id, Authentication auth, HttpSession session, RedirectAttributes redirectAttributes) {
+    public String seleccionarComunidad(@PathVariable Long id,
+                                       Authentication auth,
+                                       HttpSession session,
+                                       RedirectAttributes redirectAttributes) {
         Usuario actual = getUsuarioLogueado(auth);
-        Comunidad comunidad = comunidadRepository.findById(id)
-                .filter(c -> c.getAdministrador().getId().equals(actual.getId()))
-                .orElseThrow(() -> new RuntimeException("Sin permisos"));
+
+        Comunidad comunidad = comunidadRepository.findAccesiblesPorUsuario(actual)
+                .stream()
+                .filter(c -> c.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
+
         session.setAttribute("comunidadSeleccionada", comunidad);
-        redirectAttributes.addFlashAttribute("seleccionExito", "Comunidad '" + comunidad.getNombre() + "' activada.");
+        redirectAttributes.addFlashAttribute("seleccionExito",
+                "Comunidad '" + comunidad.getNombre() + "' activada.");
+
         return "redirect:/comunidades/lista";
     }
 
     @PostMapping("/guardar")
-    public String guardarComunidad(@ModelAttribute Comunidad comunidad, Authentication auth, RedirectAttributes redirectAttributes) {
+    public String guardarComunidad(@ModelAttribute Comunidad comunidad,
+                                   Authentication auth,
+                                   RedirectAttributes redirectAttributes) {
         return procesarPersistenciaComunidad(comunidad, auth, redirectAttributes, true);
     }
 
-    /**
-     * Endpoint corregido para actualización de comunidades.
-     * Recupera la entidad persistida para conservar sus relaciones y colecciones de base de datos.
-     */
     @PostMapping("/actualizar/{id}")
-    public String actualizarComunidad(@PathVariable Long id, @ModelAttribute Comunidad comunidadForm, Authentication auth, RedirectAttributes redirectAttributes) {
+    public String actualizarComunidad(@PathVariable Long id,
+                                      @ModelAttribute Comunidad comunidadForm,
+                                      Authentication auth,
+                                      RedirectAttributes redirectAttributes) {
         Usuario actual = getUsuarioLogueado(auth);
 
-        // 1. Buscamos el registro real y original de la base de datos
-        Comunidad comunidadAPersistir = comunidadRepository.findById(id)
-                .filter(c -> c.getAdministrador().getId().equals(actual.getId()))
+        Comunidad comunidadAPersistir = comunidadRepository.findAccesiblesPorUsuario(actual)
+                .stream()
+                .filter(c -> c.getId().equals(id))
+                .findFirst()
                 .orElseThrow(() -> new RuntimeException("No existe o no tiene permisos para actualizar esta comunidad."));
 
-        // 2. Volcamos exclusivamente los campos modificados desde el formulario HTML
         comunidadAPersistir.setNombre(comunidadForm.getNombre());
         comunidadAPersistir.setDireccion(comunidadForm.getDireccion());
         comunidadAPersistir.setPoblacion(comunidadForm.getPoblacion());
         comunidadAPersistir.setCodigoPostal(comunidadForm.getCodigoPostal());
-        comunidadAPersistir.setIdentificadorAcreedor(comunidadForm.getIdentificadorAcreedor());
-        comunidadAPersistir.setIban(comunidadForm.getIban());
-        comunidadAPersistir.setBic(comunidadForm.getBic());
+        comunidadAPersistir.setProvincia(comunidadForm.getProvincia());
+        comunidadAPersistir.setPaiscod(comunidadForm.getPaiscod());
         comunidadAPersistir.setTipoReparto(comunidadForm.getTipoReparto());
 
-        // 3. Validamos el CIF/NIF sobre el objeto definitivo
-        String cif = comunidadAPersistir.getIdentificadorAcreedor();
-        if (cif != null && !cif.isEmpty() && !validarCIF(cif)) {
+        comunidadAPersistir.setNifCif(normalizarTextoSimple(comunidadForm.getNifCif()));
+        comunidadAPersistir.setIdentificadorAcreedor(normalizarTextoSimple(comunidadForm.getIdentificadorAcreedor()));
+        comunidadAPersistir.setSufijo(normalizarTextoSimple(comunidadForm.getSufijo()));
+
+        if (comunidadForm.getIban() != null) {
+            comunidadAPersistir.setIban(comunidadForm.getIban().replaceAll("\\s+", "").toUpperCase());
+        }
+
+        comunidadAPersistir.setBic(normalizarTextoSimple(comunidadForm.getBic()));
+
+        String cif = comunidadAPersistir.getNifCif();
+
+        if (cif != null && !cif.isBlank() && !validarCIF(cif)) {
             redirectAttributes.addFlashAttribute("error", "CIF/NIF inválido.");
             return "redirect:/comunidades/editar/" + id;
         }
 
-        // 4. Guardamos la entidad vinculada (provocará un UPDATE limpio en la tabla)
         comunidadRepository.save(comunidadAPersistir);
 
         redirectAttributes.addFlashAttribute("mensaje", "Comunidad actualizada correctamente");
         return "redirect:/comunidades/lista";
     }
 
-    private String procesarPersistenciaComunidad(Comunidad comunidadForm, Authentication auth, RedirectAttributes redirectAttributes, boolean esNueva) {
+    private String procesarPersistenciaComunidad(Comunidad comunidadForm,
+                                                 Authentication auth,
+                                                 RedirectAttributes redirectAttributes,
+                                                 boolean esNueva) {
         Usuario actual = getUsuarioLogueado(auth);
         Comunidad comunidadAPersistir;
 
@@ -204,23 +246,42 @@ public class ComunidadController {
             comunidadAPersistir.setDireccion(comunidadForm.getDireccion());
             comunidadAPersistir.setPoblacion(comunidadForm.getPoblacion());
             comunidadAPersistir.setCodigoPostal(comunidadForm.getCodigoPostal());
-            comunidadAPersistir.setIdentificadorAcreedor(comunidadForm.getIdentificadorAcreedor());
-            if (comunidadForm.getIban() != null) {
-                // Esto elimina CUALQUIER espacio en blanco físico antes de procesarlo
-                comunidadAPersistir.setIban(comunidadForm.getIban().replaceAll("\\s+", ""));
-            }
-            comunidadAPersistir.setBic(comunidadForm.getBic());
+            comunidadAPersistir.setProvincia(comunidadForm.getProvincia());
+            comunidadAPersistir.setPaiscod(comunidadForm.getPaiscod());
             comunidadAPersistir.setTipoReparto(comunidadForm.getTipoReparto());
+
+            comunidadAPersistir.setNifCif(normalizarTextoSimple(comunidadForm.getNifCif()));
+            comunidadAPersistir.setIdentificadorAcreedor(normalizarTextoSimple(comunidadForm.getIdentificadorAcreedor()));
+            comunidadAPersistir.setSufijo(normalizarTextoSimple(comunidadForm.getSufijo()));
+
+            if (comunidadForm.getIban() != null) {
+                comunidadAPersistir.setIban(comunidadForm.getIban().replaceAll("\\s+", "").toUpperCase());
+            }
+
+            comunidadAPersistir.setBic(normalizarTextoSimple(comunidadForm.getBic()));
         } else {
             comunidadAPersistir = comunidadForm;
+
+            comunidadAPersistir.setNifCif(normalizarTextoSimple(comunidadAPersistir.getNifCif()));
+            comunidadAPersistir.setIdentificadorAcreedor(normalizarTextoSimple(comunidadAPersistir.getIdentificadorAcreedor()));
+            comunidadAPersistir.setSufijo(normalizarTextoSimple(comunidadAPersistir.getSufijo()));
+
+            if (comunidadAPersistir.getIban() != null) {
+                comunidadAPersistir.setIban(comunidadAPersistir.getIban().replaceAll("\\s+", "").toUpperCase());
+            }
+
+            comunidadAPersistir.setBic(normalizarTextoSimple(comunidadAPersistir.getBic()));
         }
 
         comunidadAPersistir.setAdministrador(actual);
 
-        String cif = comunidadAPersistir.getIdentificadorAcreedor();
-        if (cif != null && !cif.isEmpty() && !validarCIF(cif)) {
+        String cif = comunidadAPersistir.getNifCif();
+
+        if (cif != null && !cif.isBlank() && !validarCIF(cif)) {
             redirectAttributes.addFlashAttribute("error", "CIF/NIF inválido.");
-            return esNueva ? "redirect:/comunidades/nueva" : "redirect:/comunidades/editar/" + comunidadForm.getId();
+            return esNueva
+                    ? "redirect:/comunidades/nueva"
+                    : "redirect:/comunidades/editar/" + comunidadForm.getId();
         }
 
         Comunidad guardada = comunidadRepository.save(comunidadAPersistir);
@@ -230,165 +291,74 @@ public class ComunidadController {
             contabilidadService.inicializarPlanContable(guardada);
         }
 
-        redirectAttributes.addFlashAttribute("mensaje", esNueva ? "Comunidad creada con éxito" : "Comunidad actualizada correctamente");
+        redirectAttributes.addFlashAttribute("mensaje",
+                esNueva ? "Comunidad creada con éxito" : "Comunidad actualizada correctamente");
+
         return "redirect:/comunidades/lista";
     }
 
     private boolean validarCIF(String cif) {
-        if (cif == null || cif.length() != 9) return false;
+        if (cif == null || cif.length() != 9) {
+            return false;
+        }
+
         cif = cif.toUpperCase();
         String letras = "ABCDEFGHJNPQRSUVW";
-        if (letras.indexOf(cif.substring(0, 1)) == -1) return false;
+
+        if (letras.indexOf(cif.substring(0, 1)) == -1) {
+            return false;
+        }
+
         try {
             String digitos = cif.substring(1, 8);
+
             int sumaPares = 0;
-            for (int i = 1; i < digitos.length(); i += 2) sumaPares += Character.getNumericValue(digitos.charAt(i));
+            for (int i = 1; i < digitos.length(); i += 2) {
+                sumaPares += Character.getNumericValue(digitos.charAt(i));
+            }
+
             int sumaImpares = 0;
             for (int i = 0; i < digitos.length(); i += 2) {
                 int doble = Character.getNumericValue(digitos.charAt(i)) * 2;
                 sumaImpares += (doble > 9) ? (doble - 9) : doble;
             }
+
             int numControl = (10 - ((sumaPares + sumaImpares) % 10)) % 10;
             char letraControl = "JABCDEFGHI".charAt(numControl);
             char ultimo = cif.charAt(8);
-            return (ultimo == Character.forDigit(numControl, 10) || ultimo == letraControl);
-        } catch (Exception e) { return false; }
+
+            return ultimo == Character.forDigit(numControl, 10) || ultimo == letraControl;
+
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @GetMapping("/descargar-c19/{id}")
     public ResponseEntity<byte[]> descargarC19(@PathVariable Long id,
-                                               @RequestParam("fechaVencimiento") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaVencimiento,
+                                               @RequestParam("fechaVencimiento")
+                                               @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                                               LocalDate fechaVencimiento,
                                                Authentication auth) {
 
         if (!licenseService.validarLicencia()) {
             log.warn("Descarga bloqueada: El equipo [{}] no dispone de licencia activa.", licenseService.getEquipoID());
-            String mensajeInformativo = "SISTEMA NO ACTIVADO. ID de su equipo: " + licenseService.getEquipoID();
-            return ResponseEntity.status(402).contentType(MediaType.TEXT_PLAIN).body(mensajeInformativo.getBytes(StandardCharsets.UTF_8));
+
+            String mensajeInformativo =
+                    "SISTEMA NO ACTIVADO. ID de su equipo: " + licenseService.getEquipoID();
+
+            return ResponseEntity.status(402)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(mensajeInformativo.getBytes(StandardCharsets.UTF_8));
         }
 
         Usuario actual = getUsuarioLogueado(auth);
-        Comunidad comunidad = comunidadRepository.findById(id)
-                .filter(c -> c.getAdministrador().getId().equals(actual.getId()))
-                .orElseThrow(() -> new RuntimeException("Sin permisos"));
 
-        List<Vecino> vecinos = vecinoRepository.findByComunidad(comunidad);
-        String contenido = sepaService.generarCuaderno19(comunidad, vecinos, fechaVencimiento);
-
-        BigDecimal totalRemesa = vecinos.stream()
-                .filter(Vecino::isDomiciliado)
-                .map(Vecino::getImporteTotalConceptos)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        FicheroGenerado historico = new FicheroGenerado();
-        historico.setComunidad(comunidad);
-        historico.setIdentificadorFichero("REM-" + System.currentTimeMillis());
-        historico.setTotalImporte(totalRemesa);
-        historico.setNumeroRecibos((int) vecinos.stream().filter(Vecino::isDomiciliado).count());
-        historico.setNombreArchivo("REMESA_" + normalizarNombreFichero(comunidad.getNombre()) + "_" +
-                fechaVencimiento.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) + ".c19");
-        historico.setContenido(contenido);
-        ficheroRepository.save(historico);
-
-        byte[] data = contenido.getBytes(StandardCharsets.UTF_8);
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + historico.getNombreArchivo() + "\"")
-                .body(data);
-    }
-
-    @GetMapping("/historial-remesas")
-    public String verHistorial(Model model, Authentication auth) {
-        Usuario actual = getUsuarioLogueado(auth);
-        model.addAttribute("remesas", ficheroRepository.findByUsuarioId(actual.getId()));
-        model.addAttribute("activePage", "generar");
-        return "remesas-historial";
-    }
-
-    @GetMapping("/descargar-remesa-guardada/{id}")
-    public ResponseEntity<byte[]> descargarGuardada(@PathVariable Long id, Authentication auth) {
-        Usuario actual = getUsuarioLogueado(auth);
-        FicheroGenerado f = ficheroRepository.findById(id)
-                .filter(remesa -> remesa.getComunidad().getAdministrador().getId().equals(actual.getId()))
-                .orElseThrow(() -> new RuntimeException("Fichero no encontrado"));
-
-        byte[] data = f.getContenido().getBytes(StandardCharsets.UTF_8);
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + f.getNombreArchivo() + "\"")
-                .body(data);
-    }
-
-    @GetMapping("/informe-global-pdf")
-    public ResponseEntity<byte[]> descargarInformeGlobal(Authentication auth) {
-        Usuario actual = getUsuarioLogueado(auth);
-        List<Comunidad> misComunidades = comunidadRepository.findByAdministrador(actual);
-
-        try {
-            byte[] pdfContent = pdfService.generarInformeGlobal(misComunidades);
-            String nombreArchivo = "INFORME_GLOBAL_" + LocalDate.now() + ".pdf";
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_PDF)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombreArchivo + "\"")
-                    .body(pdfContent);
-        } catch (Exception e) {
-            log.error("Error al generar el informe global: ", e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    private String normalizarNombreFichero(String nombre) {
-        if (nombre == null) return "COMUNIDAD";
-        String temp = java.text.Normalizer.normalize(nombre, java.text.Normalizer.Form.NFD);
-        return temp.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "").replace("Ñ", "N").replace("ñ", "n").replaceAll("[^a-zA-Z0-9]", "_").toUpperCase();
-    }
-
-    private Usuario getUsuarioLogueado(Authentication auth) {
-        return usuarioRepository.findByUsername(auth.getName()).orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-    }
-
-    @GetMapping("/{id}/descargar-qr")
-    public ResponseEntity<byte[]> descargarQrPdf(@PathVariable Long id) {
-        try {
-            Comunidad comunidad = comunidadRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
-
-            byte[] pdfBytes = qrPdfService.generarPdfSoloQr(comunidad);
-            String filename = "QR_INCIDENCIAS_" + comunidad.getNombre().replace(" ", "_") + ".pdf";
-
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
-                    .contentType(MediaType.APPLICATION_PDF)
-                    .body(pdfBytes);
-        } catch (Exception e) {
-            log.error("Error generando PDF del QR: {}", e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    @PostMapping("/generar-remesa")
-    public ResponseEntity<byte[]> generarRemesa(
-            @RequestParam("comunidadId") Long id,
-            @RequestParam("fechaVencimiento") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaVencimiento,
-            @RequestParam("mes") int mes,
-            @RequestParam("anio") int anio,
-            @RequestParam(value = "sustituir", defaultValue = "false") boolean sustituir,
-            Authentication auth) {
-
-        if (!licenseService.validarLicencia()) {
-            log.warn("Descarga bloqueada: El equipo [{}] no dispone de licencia activa.", licenseService.getEquipoID());
-            String mensajeInformativo = "SISTEMA NO ACTIVADO. ID de su equipo: " + licenseService.getEquipoID();
-            return ResponseEntity.status(402).contentType(MediaType.TEXT_PLAIN).body(mensajeInformativo.getBytes(StandardCharsets.UTF_8));
-        }
-
-        Usuario actual = getUsuarioLogueado(auth);
-        Comunidad comunidad = comunidadRepository.findById(id)
-                .filter(c -> c.getAdministrador().getId().equals(actual.getId()))
-                .orElseThrow(() -> new RuntimeException("Sin permisos"));
-
-        if (sustituir) {
-            log.info("GTI: El usuario eligió MODIFICAR. Borrando datos previos de {}/{}", mes, anio);
-            contabilidadService.borrarRecibosYcontabilidadDelMes(id, mes, anio, "ORDINARIA", null, true);
-        }
+        Comunidad comunidad = comunidadRepository.findAccesiblesPorUsuario(actual)
+                .stream()
+                .filter(c -> c.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
 
         List<Vecino> vecinos = vecinoRepository.findByComunidad(comunidad);
 
@@ -398,7 +368,8 @@ public class ComunidadController {
                 fechaVencimiento,
                 "ORDINARIA",
                 null,
-                sustituir
+                true,
+                null
         );
 
         BigDecimal totalRemesa = vecinos.stream()
@@ -411,15 +382,276 @@ public class ComunidadController {
         historico.setIdentificadorFichero("REM-" + System.currentTimeMillis());
         historico.setTotalImporte(totalRemesa);
         historico.setNumeroRecibos((int) vecinos.stream().filter(Vecino::isDomiciliado).count());
-        historico.setNombreArchivo("REMESA_" + normalizarNombreFichero(comunidad.getNombre()) + "_" +
-                fechaVencimiento.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) + ".c19");
+        historico.setNombreArchivo(
+                "REMESA_" +
+                        normalizarNombreFichero(comunidad.getNombre()) +
+                        "_" +
+                        fechaVencimiento.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) +
+                        ".c19"
+        );
         historico.setContenido(contenido);
+
         ficheroRepository.save(historico);
 
         byte[] data = contenido.getBytes(StandardCharsets.UTF_8);
+
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + historico.getNombreArchivo() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + historico.getNombreArchivo() + "\"")
+                .body(data);
+    }
+
+    @GetMapping("/historial-remesas")
+    public String verHistorial(Model model, Authentication auth) {
+        Usuario actual = getUsuarioLogueado(auth);
+
+        model.addAttribute("remesas", ficheroRepository.findByUsuarioId(actual.getId()));
+        model.addAttribute("activePage", "generar");
+
+        return "remesas-historial";
+    }
+
+    @GetMapping("/descargar-remesa-guardada/{id}")
+    public ResponseEntity<byte[]> descargarGuardada(@PathVariable Long id, Authentication auth) {
+        Usuario actual = getUsuarioLogueado(auth);
+
+        FicheroGenerado f = ficheroRepository.findById(id)
+                .filter(remesa -> remesa.getComunidad().getAdministrador().getId().equals(actual.getId()))
+                .orElseThrow(() -> new RuntimeException("Fichero no encontrado"));
+
+        byte[] data = f.getContenido().getBytes(StandardCharsets.UTF_8);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + f.getNombreArchivo() + "\"")
+                .body(data);
+    }
+
+    @GetMapping("/informe-global-pdf")
+    public ResponseEntity<byte[]> descargarInformeGlobal(Authentication auth) {
+        Usuario actual = getUsuarioLogueado(auth);
+        List<Comunidad> misComunidades = comunidadRepository.findAccesiblesPorUsuario(actual);
+
+        try {
+            byte[] pdfContent = pdfService.generarInformeGlobal(misComunidades);
+            String nombreArchivo = "INFORME_GLOBAL_" + LocalDate.now() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + nombreArchivo + "\"")
+                    .body(pdfContent);
+
+        } catch (Exception e) {
+            log.error("Error al generar el informe global: ", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    private String normalizarNombreFichero(String nombre) {
+        if (nombre == null) {
+            return "COMUNIDAD";
+        }
+
+        String temp = java.text.Normalizer.normalize(nombre, java.text.Normalizer.Form.NFD);
+
+        return temp
+                .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+                .replace("Ñ", "N")
+                .replace("ñ", "n")
+                .replaceAll("[^a-zA-Z0-9]", "_")
+                .toUpperCase();
+    }
+
+    private Usuario getUsuarioLogueado(Authentication auth) {
+        return usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+    }
+
+    @GetMapping("/{id}/descargar-qr")
+    public ResponseEntity<byte[]> descargarQrPdf(@PathVariable Long id) {
+        try {
+            Comunidad comunidad = comunidadRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
+
+            byte[] pdfBytes = qrPdfService.generarPdfSoloQr(comunidad);
+            String filename = "QR_INCIDENCIAS_" + comunidad.getNombre().replace(" ", "_") + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=" + filename)
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+
+        } catch (Exception e) {
+            log.error("Error generando PDF del QR: {}", e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/generar-remesa")
+    public ResponseEntity<byte[]> generarRemesa(
+            @RequestParam("comunidadId") Long id,
+            @RequestParam("fechaVencimiento")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate fechaVencimiento,
+            @RequestParam("mes") int mes,
+            @RequestParam("anio") int anio,
+            @RequestParam(value = "sustituir", defaultValue = "false") boolean sustituir,
+            @RequestParam(value = "cuentaPresentadorId", required = false) Long cuentaPresentadorId,
+            Authentication auth) {
+
+        if (!licenseService.validarLicencia()) {
+            log.warn("Descarga bloqueada: El equipo [{}] no dispone de licencia activa.", licenseService.getEquipoID());
+
+            String mensajeInformativo =
+                    "SISTEMA NO ACTIVADO. ID de su equipo: " + licenseService.getEquipoID();
+
+            return ResponseEntity.status(402)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(mensajeInformativo.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Usuario actual = getUsuarioLogueado(auth);
+
+        Comunidad comunidad = comunidadRepository.findAccesiblesPorUsuario(actual)
+                .stream()
+                .filter(c -> c.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
+
+        if (sustituir) {
+            log.info("GTI: El usuario eligió MODIFICAR. Borrando datos previos de {}/{}", mes, anio);
+
+            contabilidadService.borrarRecibosYcontabilidadDelMes(
+                    id,
+                    mes,
+                    anio,
+                    "ORDINARIA",
+                    null,
+                    true
+            );
+        }
+
+        List<Vecino> vecinos = vecinoRepository.findByComunidad(comunidad);
+
+        String contenido = sepaService.generarCuaderno19(
+                comunidad,
+                vecinos,
+                fechaVencimiento,
+                "ORDINARIA",
+                null,
+                sustituir,
+                cuentaPresentadorId
+        );
+
+        BigDecimal totalRemesa = vecinos.stream()
+                .filter(Vecino::isDomiciliado)
+                .map(Vecino::getImporteTotalConceptos)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        FicheroGenerado historico = new FicheroGenerado();
+
+        historico.setComunidad(comunidad);
+        historico.setIdentificadorFichero("REM-" + System.currentTimeMillis());
+        historico.setTotalImporte(totalRemesa);
+        historico.setNumeroRecibos((int) vecinos.stream().filter(Vecino::isDomiciliado).count());
+        historico.setNombreArchivo(
+                "REMESA_" +
+                        normalizarNombreFichero(comunidad.getNombre()) +
+                        "_" +
+                        fechaVencimiento.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) +
+                        ".c19"
+        );
+        historico.setContenido(contenido);
+
+        ficheroRepository.save(historico);
+
+        byte[] data = contenido.getBytes(StandardCharsets.UTF_8);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + historico.getNombreArchivo() + "\"")
+                .body(data);
+    }
+
+    private String normalizarTextoSimple(String valor) {
+        if (valor == null) {
+            return null;
+        }
+
+        String limpio = valor.replaceAll("\\s+", "").toUpperCase();
+
+        return limpio.isBlank() ? null : limpio;
+    }
+
+    @GetMapping("/descargar-xml-sepa/{id}")
+    public ResponseEntity<byte[]> descargarXmlSepa(
+            @PathVariable Long id,
+            @RequestParam("fechaVencimiento")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate fechaVencimiento,
+            Authentication auth
+    ) {
+
+        if (!licenseService.validarLicencia()) {
+            String mensajeInformativo =
+                    "SISTEMA NO ACTIVADO. ID de su equipo: " + licenseService.getEquipoID();
+
+            return ResponseEntity.status(402)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(mensajeInformativo.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Usuario actual = getUsuarioLogueado(auth);
+
+        Comunidad comunidad = comunidadRepository.findAccesiblesPorUsuario(actual)
+                .stream()
+                .filter(c -> c.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Comunidad no encontrada"));
+
+        List<Vecino> vecinos = vecinoRepository.findByComunidad(comunidad);
+
+        String contenido = sepaXmlService.generarPain008(
+                comunidad,
+                vecinos,
+                fechaVencimiento
+        );
+
+        BigDecimal totalRemesa = vecinos.stream()
+                .filter(Vecino::isDomiciliado)
+                .map(Vecino::getImporteTotalConceptos)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        String nombreArchivo =
+                "ADEUDOS_" +
+                        normalizarNombreFichero(comunidad.getNombre()) +
+                        "_" +
+                        fechaVencimiento.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) +
+                        ".xml";
+
+        FicheroGenerado historico = new FicheroGenerado();
+        historico.setComunidad(comunidad);
+        historico.setIdentificadorFichero("XML-" + System.currentTimeMillis());
+        historico.setTotalImporte(totalRemesa);
+        historico.setNumeroRecibos((int) vecinos.stream().filter(Vecino::isDomiciliado).count());
+        historico.setNombreArchivo(nombreArchivo);
+        historico.setContenido(contenido);
+
+        ficheroRepository.save(historico);
+
+        byte[] data = contenido.getBytes(StandardCharsets.UTF_8);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + nombreArchivo + "\""
+                )
                 .body(data);
     }
 

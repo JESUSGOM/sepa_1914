@@ -53,6 +53,9 @@ public class Comunidad {
     @Column(name = "token_qr", unique = true, length = 100)
     private String tokenQr;
 
+    @Column(name = "nif_cif", length = 20)
+    private String nifCif;
+
     // 🔹 FK usuario_id (NOT NULL)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
@@ -65,6 +68,8 @@ public class Comunidad {
 
     @OneToMany(mappedBy = "comunidad", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     private List<Vecino> vecinos = new ArrayList<>();
+
+
 
     // --- CONSTRUCTORES ---
     public Comunidad() {}
@@ -150,6 +155,9 @@ public class Comunidad {
 
     public String getTokenQr() { return tokenQr; }
     public void setTokenQr(String tokenQr) { this.tokenQr = tokenQr; }
+
+    public String getNifCif() {return nifCif;}
+    public void setNifCif(String nifCif) {this.nifCif = nifCif;}
 
     // --- equals / hashCode ---
 

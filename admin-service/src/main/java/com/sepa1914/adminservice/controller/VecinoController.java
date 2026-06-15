@@ -3,6 +3,7 @@ package com.sepa1914.adminservice.controller;
 import com.sepa1914.adminservice.model.Comunidad;
 import com.sepa1914.adminservice.model.Vecino;
 import com.sepa1914.adminservice.model.ConceptoCobro;
+import com.sepa1914.adminservice.model.VecinoDocumento;
 import com.sepa1914.adminservice.repository.*;
 import com.sepa1914.adminservice.service.BankService;
 import com.sepa1914.adminservice.service.ContabilidadService;
@@ -54,6 +55,8 @@ public class VecinoController {
     private final ContabilidadService contabilidadService;
     private final CuentaContableRepository cuentaContableRepository;
     private final ConceptoCobroRepository conceptoCobroRepo;
+    private final UsuarioComunidadRepository usuarioComunidadRepository;
+    private final VecinoDocumentoRepository vecinoDocumentoRepository;
 
     @Value("${storage.location}")
     private String storageLocation;
@@ -67,7 +70,9 @@ public class VecinoController {
                             ContabilidadService contabilidadService,
                             PdfService pdfService,
                             StorageService storageService,
-                            CuentaContableRepository cuentaContableRepository) {
+                            CuentaContableRepository cuentaContableRepository,
+                            UsuarioComunidadRepository usuarioComunidadRepository,
+                            VecinoDocumentoRepository vecinoDocumentoRepository) {
         this.comunidadRepository = comunidadRepository;
         this.vecinoRepository = vecinoRepository;
         this.conceptoRepo = conceptoRepo;
@@ -78,6 +83,8 @@ public class VecinoController {
         this.pdfService = pdfService;
         this.storageService = storageService;
         this.cuentaContableRepository = cuentaContableRepository;
+        this.usuarioComunidadRepository = usuarioComunidadRepository;
+        this.vecinoDocumentoRepository = vecinoDocumentoRepository;
     }
 
     /**
@@ -103,7 +110,7 @@ public class VecinoController {
             return "redirect:/comunidades/lista";
         }
 
-        if (!comunidad.getAdministrador().getUsername().equals(auth.getName())) {
+        if (!usuarioTieneAccesoAComunidad(comunidad, auth)) {
             log.warn("Acceso denegado: Usuario {} intentó acceder a Comunidad {}", auth.getName(), comunidadId);
             return "redirect:/comunidades/lista?error=no_autorizado";
         }
@@ -153,7 +160,7 @@ public class VecinoController {
     @GetMapping("/editar/{id}")
     public String editarVecino(@PathVariable Long id, Model model, Authentication auth) {
         Vecino vecino = vecinoRepository.findById(id).orElseThrow();
-        if (!vecino.getComunidad().getAdministrador().getUsername().equals(auth.getName())) {
+        if (!usuarioTieneAccesoAComunidad(vecino.getComunidad(), auth)) {
             return "redirect:/comunidades/lista?error=no_autorizado";
         }
         model.addAttribute("vecino", vecino);
@@ -182,6 +189,13 @@ public class VecinoController {
                 existente.setTelefono_2(vecino.getTelefono_2());
                 existente.setTelefono_3(vecino.getTelefono_3());
                 existente.setNotas(vecino.getNotas());
+                existente.setDireccion(vecino.getDireccion());
+                existente.setPoblacion(vecino.getPoblacion());
+                existente.setProvincia(vecino.getProvincia());
+                existente.setCodigopostal(vecino.getCodigopostal());
+                existente.setPais_cod(vecino.getPais_cod());
+                existente.setDireccionNotificacion(vecino.getDireccionNotificacion());
+                existente.setRutaMandatoFirmado(vecino.getRutaMandatoFirmado());
 
                 if (existente.getIban() != null && !existente.getIban().isBlank() &&
                         (existente.getReferenciaMandato() == null || existente.getReferenciaMandato().isBlank())) {
@@ -210,7 +224,7 @@ public class VecinoController {
     public String eliminarVecino(@PathVariable Long id, Authentication auth, RedirectAttributes ra) {
         try {
             Vecino vecino = vecinoRepository.findById(id).orElseThrow();
-            if (!vecino.getComunidad().getAdministrador().getUsername().equals(auth.getName())) {
+            if (!usuarioTieneAccesoAComunidad(vecino.getComunidad(), auth)) {
                 return "redirect:/comunidades/lista?error=no_autorizado";
             }
             Long comunidadId = vecino.getComunidad().getId();
@@ -256,7 +270,8 @@ public class VecinoController {
     public ResponseEntity<Resource> verMandatoFirmado(@PathVariable Long id, Authentication auth) {
         Vecino vecino = vecinoRepository.findById(id).orElseThrow();
         try {
-            Path rutaArchivo = Path.of(storageLocation).resolve(vecino.getRutaMandatoFirmado());
+            Path rutaArchivo = Path.of(System.getProperty("user.dir"))
+                    .resolve(vecino.getRutaMandatoFirmado());
             Resource recurso = new UrlResource(rutaArchivo.toUri());
             if (recurso.exists() || recurso.isReadable()) {
                 String contentType = Files.probeContentType(rutaArchivo);
@@ -281,6 +296,64 @@ public class VecinoController {
         } catch (Exception e) { return "redirect:/comunidades/lista"; }
     }
 
+    @PostMapping("/subir-mandato-bd/{id}")
+    public String subirMandatoFirmadoBD(@PathVariable Long id,
+                                        @RequestParam("fichero") MultipartFile fichero,
+                                        RedirectAttributes ra) {
+        try {
+            Vecino vecino = vecinoRepository.findById(id).orElseThrow();
+
+            VecinoDocumento documento = new VecinoDocumento();
+            documento.setVecino(vecino);
+            documento.setTipoDocumento("MANDATO_SEPA_FIRMADO");
+            documento.setNombreArchivo(fichero.getOriginalFilename());
+            documento.setContentType(fichero.getContentType());
+            documento.setContenido(fichero.getBytes());
+
+            vecinoDocumentoRepository.save(documento);
+
+            vecino.setRutaMandatoFirmado("BD:" + documento.getId());
+            vecinoRepository.save(vecino);
+
+            ra.addFlashAttribute("mensaje", "Mandato firmado guardado en base de datos.");
+            return "redirect:/vecinos/lista?comunidadId=" + vecino.getComunidad().getId();
+
+        } catch (Exception e) {
+            log.error("Error al guardar mandato firmado en BD", e);
+            ra.addFlashAttribute("error", "Error al guardar el mandato firmado.");
+            return "redirect:/comunidades/lista";
+        }
+    }
+
+    @GetMapping("/ver-mandato-bd/{id}")
+    public ResponseEntity<byte[]> verMandatoFirmadoBD(@PathVariable Long id) {
+        VecinoDocumento documento = vecinoDocumentoRepository.findById(id).orElseThrow();
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(documento.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"" + documento.getNombreArchivo() + "\"")
+                .body(documento.getContenido());
+    }
+
+    private boolean usuarioTieneAccesoAComunidad(Comunidad comunidad, Authentication auth) {
+        if (comunidad == null || auth == null) {
+            return false;
+        }
+
+        if (comunidad.getAdministrador() != null
+                && comunidad.getAdministrador().getUsername().equals(auth.getName())) {
+            return true;
+        }
+
+        return usuarioComunidadRepository.findAll()
+                .stream()
+                .anyMatch(uc ->
+                        uc.getComunidad().getId().equals(comunidad.getId())
+                                && uc.getUsuario().getUsername().equals(auth.getName())
+                );
+    }
+
     private String generarReferenciaSepa35(Comunidad comunidad, Vecino vecino) {
         String cifC = comunidad.getIdentificadorAcreedor().replaceAll("[^A-Za-z0-9]", "").toUpperCase();
         String nifV = vecino.getNif().replaceAll("[^A-Za-z0-9]", "").toUpperCase();
@@ -290,6 +363,8 @@ public class VecinoController {
         String ceros = "0".repeat(huecoParaCeros);
         return (cifC + ceros + idProp + nifV);
     }
+
+
 
     // --- MÉTODOS DE MIGRACIÓN (MANTENIDOS AL 100%) ---
 

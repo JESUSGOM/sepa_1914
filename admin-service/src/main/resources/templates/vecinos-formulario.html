@@ -7,178 +7,517 @@
 <div class="container-fluid">
     <div class="row">
         <div th:replace="~{layout :: menu}"></div>
-
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb small">
-                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
-                    <li class="breadcrumb-item"><a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}" th:text="${comunidad.nombre}">Comunidad</a></li>
-                    <li class="breadcrumb-item active">Ficha de Propiedad</li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/comunidades/lista}">
+                            Comunidades
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}"
+                           th:text="${comunidad.nombre}">
+                            Comunidad
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active">
+                        Ficha de Propiedad
+                    </li>
                 </ol>
             </nav>
 
-            <form th:action="@{/vecinos/guardar(comunidadId=${comunidad.id})}" th:object="${vecino}" method="post" autocomplete="off">
-                <input type="hidden" th:field="*{id}" />
+            <form th:action="@{/vecinos/guardar(comunidadId=${comunidad.id})}"
+                  th:object="${vecino}"
+                  method="post"
+                  autocomplete="off">
 
+                <input type="hidden" th:field="*{id}" />
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
                     <h1 class="h3 mb-0 text-dark">
                         <i class="bi bi-person-vcard-fill text-primary me-2"></i>
                         FICHA MAESTRA DEL PROPIETARIO
                     </h1>
                     <div class="btn-group shadow-sm">
-                        <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}" class="btn btn-outline-secondary px-4">Cancelar</a>
-                        <button type="submit" class="btn btn-primary px-4 fw-bold">
-                            <i class="bi bi-save2 me-2"></i> GUARDAR FICHA
+                        <a th:href="@{/vecinos/lista(comunidadId=${comunidad.id})}"
+                           class="btn btn-outline-secondary px-4">
+                            Cancelar
+                        </a>
+                        <button type="submit"
+                                class="btn btn-primary px-4 fw-bold">
+                            <i class="bi bi-save2 me-2"></i>
+                            GUARDAR FICHA
                         </button>
                     </div>
                 </div>
-
                 <div class="row g-4">
+                    <!-- IZQUIERDA -->
                     <div class="col-lg-7">
+                        <!-- DATOS PRINCIPALES -->
                         <div class="card shadow-sm border-0 mb-4">
                             <div class="card-header bg-white py-3">
-                                <h6 class="mb-0 fw-bold text-uppercase small text-muted"><i class="bi bi-info-circle me-2"></i> Datos Principales del Propietario</h6>
+                                <h6 class="mb-0 fw-bold text-uppercase small text-muted">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Datos Principales del Propietario
+                                </h6>
                             </div>
                             <div class="card-body bg-light-subtle">
                                 <div class="row g-3">
                                     <div class="col-md-12">
-                                        <label class="form-label small fw-bold">Nombre / Razón Social</label>
-                                        <input type="text" th:field="*{nombre}" class="form-control" required>
+                                        <label class="form-label small fw-bold">
+                                            Nombre / Razón Social
+                                        </label>
+                                        <input type="text"
+                                               th:field="*{nombre}"
+                                               class="form-control"
+                                               required>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label small fw-bold">NIF / CIF</label>
-                                        <input type="text" th:field="*{nif}" class="form-control" required>
+                                        <label class="form-label small fw-bold">
+                                            NIF / CIF
+                                        </label>
+                                        <input type="text"
+                                               th:field="*{nif}"
+                                               class="form-control"
+                                               required>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label small fw-bold">Vivienda / Local</label>
-                                        <input type="text" th:field="*{vivienda}" class="form-control" required>
+                                        <label class="form-label small fw-bold">
+                                            Vivienda / Local
+                                        </label>
+                                        <input type="text"
+                                               th:field="*{vivienda}"
+                                               class="form-control"
+                                               required>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
+                        <!-- GESTIÓN COBROS -->
                         <div class="card shadow-sm border-0">
                             <div class="card-header bg-white py-3">
-                                <h6 class="mb-0 fw-bold text-uppercase small text-muted"><i class="bi bi-bank me-2"></i> Gestión de Cobros y SEPA</h6>
+                                <h6 class="mb-0 fw-bold text-uppercase small text-muted">
+                                    <i class="bi bi-bank me-2"></i>
+                                    Gestión de Cobros y SEPA
+                                </h6>
                             </div>
                             <div class="card-body bg-light-subtle">
                                 <div class="row g-3 mb-4">
                                     <div class="col-md-8">
-                                        <label class="form-label small fw-bold text-primary">Cuenta Bancaria (IBAN)</label>
-                                        <input type="text" th:field="*{iban}" class="form-control font-monospace border-primary shadow-sm" placeholder="ES00 0000...">
+                                        <label class="form-label small fw-bold text-primary">
+                                            Cuenta Bancaria (IBAN)
+                                        </label>
+                                        <input type="text"
+                                               th:field="*{iban}"
+                                               class="form-control font-monospace border-primary shadow-sm"
+                                               placeholder="ES00 0000...">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label small fw-bold">BIC / SWIFT</label>
-                                        <input type="text" th:field="*{bic}" class="form-control shadow-sm">
+                                        <label class="form-label small fw-bold">
+                                            BIC / SWIFT
+                                        </label>
+                                        <input type="text"
+                                               th:field="*{bic}"
+                                               class="form-control shadow-sm">
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label small fw-bold">Referencia Mandato</label>
-                                        <input type="text" th:field="*{referenciaMandato}" class="form-control bg-white" readonly>
+                                        <label class="form-label small fw-bold">
+                                            Referencia Mandato
+                                        </label>
+                                        <input type="text"
+                                               th:field="*{referenciaMandato}"
+                                               class="form-control bg-white"
+                                               readonly>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label small fw-bold text-danger">Coeficiente % (Total)</label>
-                                        <input type="number" step="0.0001" th:field="*{coeficiente}" id="coeficienteReal" class="form-control fw-bold text-end border-danger shadow-sm">
+                                        <label class="form-label small fw-bold text-danger">
+                                            Coeficiente % (Total)
+                                        </label>
+                                        <input type="number"
+                                               step="0.0001"
+                                               th:field="*{coeficiente}"
+                                               id="coeficienteReal"
+                                               class="form-control fw-bold text-end border-danger shadow-sm">
                                     </div>
                                 </div>
-
                                 <div class="p-3 border rounded bg-white">
-                                    <div class="small fw-bold text-uppercase text-muted mb-2 border-bottom pb-1">Calculador de Coeficiente Especial</div>
+                                    <div class="small fw-bold text-uppercase text-muted mb-2 border-bottom pb-1">
+                                        Calculador de Coeficiente Especial
+                                    </div>
                                     <div class="row g-2">
                                         <div class="col-md-4">
-                                            <label class="x-small fw-bold">C. Vivienda</label>
-                                            <input type="number" step="0.0001" id="c_viv" class="form-control form-control-sm calc-input" value="0.0000">
+                                            <label class="x-small fw-bold">
+                                                C. Vivienda
+                                            </label>
+                                            <input type="number"
+                                                   step="0.0001"
+                                                   id="c_viv"
+                                                   class="form-control form-control-sm calc-input"
+                                                   value="0.0000">
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="x-small fw-bold">C. Garaje</label>
-                                            <input type="number" step="0.0001" id="c_gar" class="form-control form-control-sm calc-input" value="0.0000">
+                                            <label class="x-small fw-bold">
+                                                C. Garaje
+                                            </label>
+                                            <input type="number"
+                                                   step="0.0001"
+                                                   id="c_gar"
+                                                   class="form-control form-control-sm calc-input"
+                                                   value="0.0000">
+
                                         </div>
+
                                         <div class="col-md-4">
-                                            <label class="x-small fw-bold">C. Trastero</label>
-                                            <input type="number" step="0.0001" id="c_tra" class="form-control form-control-sm calc-input" value="0.0000">
+
+                                            <label class="x-small fw-bold">
+                                                C. Trastero
+                                            </label>
+
+                                            <input type="number"
+                                                   step="0.0001"
+                                                   id="c_tra"
+                                                   class="form-control form-control-sm calc-input"
+                                                   value="0.0000">
+
                                         </div>
+
                                     </div>
+
                                 </div>
+
                             </div>
+
                         </div>
+
                     </div>
+
+                    <!-- DERECHA -->
 
                     <div class="col-lg-5">
+
+                        <!-- CONTACTO -->
+
                         <div class="card shadow-sm border-0 mb-4">
+
                             <div class="card-header bg-white py-3">
-                                <h6 class="mb-0 fw-bold text-uppercase small text-muted"><i class="bi bi-telephone me-2"></i> Contacto y Notificaciones</h6>
+
+                                <h6 class="mb-0 fw-bold text-uppercase small text-muted">
+
+                                    <i class="bi bi-telephone me-2"></i>
+
+                                    Contacto y Notificaciones
+
+                                </h6>
+
                             </div>
+
                             <div class="card-body">
+
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">Email Principal</label>
-                                    <input type="email" th:field="*{email}" class="form-control" placeholder="correo@ejemplo.com">
+
+                                    <label class="form-label small fw-bold">
+                                        Email Principal
+                                    </label>
+
+                                    <input type="email"
+                                           th:field="*{email}"
+                                           class="form-control"
+                                           placeholder="correo@ejemplo.com">
+
                                 </div>
+
                                 <div class="row g-2 mb-3">
-                                    <div class="col-6">
-                                        <label class="form-label small fw-bold">Teléfono 1</label>
-                                        <input type="text" th:field="*{telefono_1}" class="form-control">
+
+                                    <div class="col-md-4">
+
+                                        <label class="form-label small fw-bold">
+                                            Teléfono 1
+                                        </label>
+
+                                        <input type="text"
+                                               th:field="*{telefono_1}"
+                                               class="form-control">
+
                                     </div>
-                                    <div class="col-6">
-                                        <label class="form-label small fw-bold">Teléfono 2</label>
-                                        <input type="text" th:field="*{telefono_2}" class="form-control">
+
+                                    <div class="col-md-4">
+
+                                        <label class="form-label small fw-bold">
+                                            Teléfono 2
+                                        </label>
+
+                                        <input type="text"
+                                               th:field="*{telefono_2}"
+                                               class="form-control">
+
                                     </div>
+
+                                    <div class="col-md-4">
+
+                                        <label class="form-label small fw-bold">
+                                            Teléfono 3
+                                        </label>
+
+                                        <input type="text"
+                                               th:field="*{telefono_3}"
+                                               class="form-control">
+
+                                    </div>
+
                                 </div>
+
+                                <hr>
+
+                                <h6 class="small fw-bold text-uppercase text-muted">
+
+                                    Dirección Postal
+
+                                </h6>
+
+                                <div class="mb-3">
+
+                                    <label class="form-label small fw-bold">
+                                        Dirección
+                                    </label>
+
+                                    <input type="text"
+                                           th:field="*{direccion}"
+                                           class="form-control">
+
+                                </div>
+
+                                <div class="row g-2 mb-3">
+
+                                    <div class="col-md-5">
+
+                                        <label class="form-label small fw-bold">
+                                            Población
+                                        </label>
+
+                                        <input type="text"
+                                               th:field="*{poblacion}"
+                                               class="form-control">
+
+                                    </div>
+
+                                    <div class="col-md-4">
+
+                                        <label class="form-label small fw-bold">
+                                            Provincia
+                                        </label>
+
+                                        <input type="text"
+                                               th:field="*{provincia}"
+                                               class="form-control">
+
+                                    </div>
+
+                                    <div class="col-md-3">
+
+                                        <label class="form-label small fw-bold">
+                                            CP
+                                        </label>
+
+                                        <input type="text"
+                                               th:field="*{codigopostal}"
+                                               class="form-control">
+
+                                    </div>
+
+                                </div>
+
+                                <div class="mb-3">
+
+                                    <label class="form-label small fw-bold">
+                                        País
+                                    </label>
+
+                                    <select th:field="*{pais_cod}"
+                                            class="form-select">
+
+                                        <option value="ES">España</option>
+                                        <option value="PT">Portugal</option>
+                                        <option value="FR">Francia</option>
+
+                                    </select>
+
+                                </div>
+
+                                <hr>
+
+                                <div class="mb-3">
+
+                                    <label class="form-label small fw-bold text-primary">
+                                        Dirección de Notificación
+                                    </label>
+
+                                    <textarea th:field="*{direccionNotificacion}"
+                                              class="form-control"
+                                              rows="3"
+                                              placeholder="Solo si las notificaciones deben enviarse a otra dirección"></textarea>
+
+                                </div>
+
+                                <div class="mb-3">
+
+                                    <label class="form-label small fw-bold">
+                                        Ruta / Documento Mandato Firmado
+                                    </label>
+
+                                    <input type="text"
+                                           th:field="*{rutaMandatoFirmado}"
+                                           class="form-control"
+                                           placeholder="mandatos/vecino_15.pdf">
+
+                                </div>
+
                                 <div>
-                                    <label class="form-label small fw-bold">Notas Internas</label>
-                                    <textarea th:field="*{notas}" class="form-control" rows="5" placeholder="Observaciones sobre el propietario..."></textarea>
+
+                                    <label class="form-label small fw-bold">
+                                        Notas Internas
+                                    </label>
+
+                                    <textarea th:field="*{notas}"
+                                              class="form-control"
+                                              rows="5"
+                                              placeholder="Observaciones sobre el propietario..."></textarea>
+
                                 </div>
+
                             </div>
+
                         </div>
 
+                        <!-- OPCIONES -->
+
                         <div class="card shadow-sm border-0">
+
                             <div class="card-header bg-white py-3">
-                                <h6 class="mb-0 fw-bold text-uppercase small text-muted"><i class="bi bi-gear-wide-connected me-2"></i> Opciones y Estado</h6>
+
+                                <h6 class="mb-0 fw-bold text-uppercase small text-muted">
+
+                                    <i class="bi bi-gear-wide-connected me-2"></i>
+
+                                    Opciones y Estado
+
+                                </h6>
+
                             </div>
+
                             <div class="card-body">
+
                                 <div class="form-check form-switch mb-3">
-                                    <input class="form-check-input" type="checkbox" th:field="*{domiciliado}" id="swDom">
-                                    <label class="form-check-label fw-bold small" for="swDom">¿DOMICILIAR RECIBOS POR BANCO?</label>
+
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           th:field="*{domiciliado}"
+                                           id="swDom">
+
+                                    <label class="form-check-label fw-bold small"
+                                           for="swDom">
+
+                                        ¿DOMICILIAR RECIBOS POR BANCO?
+
+                                    </label>
+
                                 </div>
+
                                 <div class="form-check form-switch mb-3">
-                                    <input class="form-check-input" type="checkbox" th:field="*{envioDigital}" id="swEnv">
-                                    <label class="form-check-label fw-bold small" for="swEnv">¿ENVÍO DIGITAL DE DOCUMENTOS?</label>
+
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           th:field="*{envioDigital}"
+                                           id="swEnv">
+
+                                    <label class="form-check-label fw-bold small"
+                                           for="swEnv">
+
+                                        ¿ENVÍO DIGITAL DE DOCUMENTOS?
+
+                                    </label>
+
                                 </div>
+
                                 <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" th:field="*{activo}" id="swAct">
-                                    <label class="form-check-label fw-bold small" for="swAct">ESTADO: PROPIETARIO ACTIVO</label>
+
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           th:field="*{activo}"
+                                           id="swAct">
+
+                                    <label class="form-check-label fw-bold small"
+                                           for="swAct">
+
+                                        ESTADO: PROPIETARIO ACTIVO
+
+                                    </label>
+
                                 </div>
+
                             </div>
+
                         </div>
+
                     </div>
+
                 </div>
+
             </form>
+
         </main>
+
     </div>
+
 </div>
 
 <style>
-    .font-monospace { font-family: 'Courier New', monospace; letter-spacing: 1px; }
-    .bg-light-subtle { background-color: #f8fbff; }
-    .x-small { font-size: 0.7rem; color: #6c757d; }
-    .card { border-radius: 8px; }
-    .form-control:focus { border-color: #0d6efd; box-shadow: 0 0 0 0.2rem rgba(13,110,253,.15); }
+
+    .font-monospace {
+        font-family: 'Courier New', monospace;
+        letter-spacing: 1px;
+    }
+
+    .bg-light-subtle {
+        background-color: #f8fbff;
+    }
+
+    .x-small {
+        font-size: 0.7rem;
+        color: #6c757d;
+    }
+
+    .card {
+        border-radius: 8px;
+    }
+
+    .form-control:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13,110,253,.15);
+    }
+
 </style>
 
 <script th:inline="javascript">
-    // Lógica del Calculador de Coeficientes (Mantenida 100%)
+
     const inputs = document.querySelectorAll('.calc-input');
     const totalField = document.getElementById('coeficienteReal');
 
     inputs.forEach(input => {
+
         input.addEventListener('input', () => {
+
             let suma = 0;
+
             inputs.forEach(i => {
                 suma += parseFloat(i.value || 0);
             });
+
             totalField.value = suma.toFixed(4);
+
         });
+
     });
 
-    // Sincronización inicial si estamos editando
     window.addEventListener('load', () => {
         const valActual = parseFloat(totalField.value || 0);
         if(valActual > 0 && document.getElementById('c_viv').value == "0.0000") {

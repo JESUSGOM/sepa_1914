@@ -41,7 +41,7 @@ public class GastoController {
     @Autowired private InvoiceScannerService invoiceScannerService;
 
     // RUTA DEFINITIVA GTI
-    private final Path rootPath = Paths.get("C:/sepa1914/ficheros/facturas");
+    private final Path rootPath = Paths.get(System.getProperty("user.dir"), "facturas");
 
     @GetMapping("/{comunidadId}")
     public String listarGastos(@PathVariable Long comunidadId, Model model) {

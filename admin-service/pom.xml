@@ -215,7 +215,8 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
-                    <argLine>-javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar</argLine>
+                    <parallel>classes</parallel>
+                    <threadCount>2</threadCount> <forkCount>1</forkCount>    <reuseForks>true</reuseForks>
                 </configuration>
             </plugin>
 

@@ -91,6 +91,17 @@
                                             th:data-iban="${v.iban}"
                                             th:data-bic="${v.bic}"
                                             th:data-mandato="${v.referenciaMandato}"
+                                            th:data-tel1="${v.telefono_1}"
+                                            th:data-tel2="${v.telefono_2}"
+                                            th:data-tel3="${v.telefono_3}"
+                                            th:data-direccion="${v.direccion}"
+                                            th:data-poblacion="${v.poblacion}"
+                                            th:data-provincia="${v.provincia}"
+                                            th:data-cp="${v.codigopostal}"
+                                            th:data-pais="${v.pais_cod}"
+                                            th:data-dirnotif="${v.direccionNotificacion}"
+                                            th:data-notas="${v.notas}"
+                                            th:data-rutamandato="${v.rutaMandatoFirmado}"
                                             onclick="cargarYMostrarModal(this)"
                                             title="Editar Datos">
                                         <i class="bi bi-pencil-fill"></i>
@@ -157,6 +168,119 @@
                         <div class="col-md-9">
                             <label class="form-label fw-bold small">Email Principal</label>
                             <input type="email" name="email" id="editEmail" class="form-control">
+                        </div>
+                        <div class="row g-3 mt-1">
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Teléfono 1</label>
+                                <input type="text" name="telefono_1" id="editTel1" class="form-control">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Teléfono 2</label>
+                                <input type="text" name="telefono_2" id="editTel2" class="form-control">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">Teléfono 3</label>
+                                <input type="text" name="telefono_3" id="editTel3" class="form-control">
+                            </div>
+
+                        </div>
+
+                        <hr class="my-3">
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">Dirección</label>
+                            <input type="text" name="direccion" id="editDireccion" class="form-control">
+                        </div>
+
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold small">Población</label>
+                            <input type="text" name="poblacion" id="editPoblacion" class="form-control">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Provincia</label>
+                            <input type="text" name="provincia" id="editProvincia" class="form-control">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">CP</label>
+                            <input type="text" name="codigopostal" id="editCp" class="form-control">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small">País</label>
+
+                            <select name="pais_cod" id="editPais" class="form-select">
+                                <option value="ES">España</option>
+                                <option value="PT">Portugal</option>
+                                <option value="FR">Francia</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-9">
+                            <label class="form-label fw-bold small text-primary">
+                                Dirección Notificación
+                            </label>
+
+                            <input type="text"
+                                   name="direccionNotificacion"
+                                   id="editDirNotif"
+                                   class="form-control">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">
+                                Ruta Mandato Firmado
+                            </label>
+
+                            <input type="text"
+                                   name="rutaMandatoFirmado"
+                                   id="editRutaMandato"
+                                   class="form-control">
+                        </div>
+
+                        <div class="mt-2">
+                            <label class="form-label small fw-bold">
+                                Subir mandato firmado PDF
+                            </label>
+
+                            <input type="file"
+                                   id="mandatoFile"
+                                   class="form-control"
+                                   accept="application/pdf">
+
+                            <button type="button"
+                                    class="btn btn-outline-primary btn-sm mt-2"
+                                    onclick="subirMandatoBD()">
+
+                                <i class="bi bi-upload"></i>
+                                Subir mandato a BD
+                            </button>
+
+                            <a id="btnVerMandatoBD"
+                               href="#"
+                               target="_blank"
+                               class="btn btn-outline-success btn-sm mt-2 d-none">
+
+                                <i class="bi bi-eye"></i>
+                                Ver mandato guardado
+                            </a>
+                        </div>
+
+
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold small">
+                                Notas Internas
+                            </label>
+
+                            <textarea name="notas"
+                                      id="editNotas"
+                                      rows="4"
+                                      class="form-control"></textarea>
                         </div>
                         <div class="col-md-9">
                             <label class="form-label fw-bold small">IBAN</label>
@@ -255,8 +379,58 @@
         document.getElementById('editMandato').value = btn.getAttribute('data-mandato');
         document.getElementById('editDom').checked = (btn.getAttribute('data-domiciliado') === 'true');
         document.getElementById('editActivo').checked = (btn.getAttribute('data-activo') === 'true');
+        document.getElementById('editTel1').value = btn.getAttribute('data-tel1');
+        document.getElementById('editTel2').value = btn.getAttribute('data-tel2');
+        document.getElementById('editTel3').value = btn.getAttribute('data-tel3');
+
+        document.getElementById('editDireccion').value = btn.getAttribute('data-direccion');
+        document.getElementById('editPoblacion').value = btn.getAttribute('data-poblacion');
+        document.getElementById('editProvincia').value = btn.getAttribute('data-provincia');
+        document.getElementById('editCp').value = btn.getAttribute('data-cp');
+        document.getElementById('editPais').value = btn.getAttribute('data-pais');
+
+        document.getElementById('editDirNotif').value = btn.getAttribute('data-dirnotif');
+        document.getElementById('editNotas').value = btn.getAttribute('data-notas');
+        document.getElementById('editRutaMandato').value = btn.getAttribute('data-rutamandato');
         var myModal = new bootstrap.Modal(document.getElementById('modalEditarVecino'));
         myModal.show();
+    }
+
+    function subirMandatoBD() {
+
+        const vecinoId = document.getElementById('editId').value;
+        const fileInput = document.getElementById('mandatoFile');
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+
+            alert('Selecciona un PDF primero.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('fichero', fileInput.files[0]);
+
+        fetch('/vecinos/subir-mandato-bd/' + vecinoId, {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+
+                if (response.ok || response.redirected) {
+
+                    alert('Mandato guardado en base de datos.');
+                    window.location.reload();
+
+                } else {
+
+                    alert('Error al subir el mandato.');
+                }
+            })
+            .catch(error => {
+
+                console.error(error);
+                alert('Error de comunicación al subir el mandato.');
+            });
     }
 </script>
 

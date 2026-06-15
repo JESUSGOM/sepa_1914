@@ -1,135 +1,357 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{layout :: head}">
-    <title th:text="${comunidad.id != null} ? 'Editar Comunidad - SEPA 1914' : 'Nueva Comunidad - SEPA 1914'">Comunidad - SEPA 1914</title>
+    <title th:text="${comunidad.id != null} ? 'Editar Comunidad - SEPA 1914' : 'Nueva Comunidad - SEPA 1914'">
+        Comunidad - SEPA 1914
+    </title>
 </head>
+
 <body class="bg-light">
 <div class="container-fluid">
     <div class="row">
         <div th:replace="~{layout :: menu}"></div>
 
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb shadow-sm p-2 bg-white rounded">
-                    <li class="breadcrumb-item"><a th:href="@{/comunidades/lista}">Comunidades</a></li>
-                    <li class="breadcrumb-item active" aria-current="page"
-                        th:text="${comunidad.id != null} ? 'Editar Comunidad' : 'Nueva Comunidad'">Nueva Comunidad</li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/comunidades/lista}">Comunidades</a>
+                    </li>
+
+                    <li class="breadcrumb-item active"
+                        aria-current="page"
+                        th:text="${comunidad.id != null} ? 'Editar Comunidad' : 'Nueva Comunidad'">
+                        Nueva Comunidad
+                    </li>
                 </ol>
             </nav>
 
             <div class="row justify-content-center">
                 <div class="col-xl-8">
+
                     <div class="card shadow border-0">
-                        <div class="card-header py-3" th:classappend="${comunidad.id != null} ? 'bg-warning text-dark' : 'bg-primary text-white'">
+
+                        <div class="card-header py-3"
+                             th:classappend="${comunidad.id != null} ? 'bg-warning text-dark' : 'bg-primary text-white'">
+
                             <h4 class="mb-0">
                                 <i th:class="${comunidad.id != null} ? 'bi bi-pencil-square' : 'bi bi-building-add'"></i>
-                                <span th:text="${comunidad.id != null} ? ' Modificar Comunidad' : ' Alta de Comunidad (Acreedor SEPA)'"></span>
+
+                                <span th:text="${comunidad.id != null}
+                                    ? ' Modificar Comunidad'
+                                    : ' Alta de Comunidad (Acreedor SEPA)'"></span>
                             </h4>
                         </div>
 
                         <div class="card-body p-4">
-                            <form th:action="${comunidad.id != null} ? @{/comunidades/actualizar/{id}(id=${comunidad.id})} : @{/comunidades/guardar}"
-                                  th:object="${comunidad}" method="post">
+
+                            <form th:action="${comunidad.id != null}
+                                ? @{/comunidades/actualizar/{id}(id=${comunidad.id})}
+                                : @{/comunidades/guardar}"
+                                  th:object="${comunidad}"
+                                  method="post">
 
                                 <input type="hidden" th:field="*{id}">
 
+                                <!-- DATOS GENERALES -->
                                 <div class="mb-4">
-                                    <h5 class="text-secondary border-bottom pb-2 mb-3"><i class="bi bi-info-circle me-2"></i>Datos Generales</h5>
+
+                                    <h5 class="text-secondary border-bottom pb-2 mb-3">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        Datos Generales
+                                    </h5>
 
                                     <div class="mb-3">
-                                        <label class="form-label fw-bold">Nombre de la Comunidad (Norma SEPA AT-03)</label>
-                                        <input type="text" th:field="*{nombre}" class="form-control shadow-sm"
+                                        <label class="form-label fw-bold">
+                                            Nombre de la Comunidad (Norma SEPA AT-03)
+                                        </label>
+
+                                        <input type="text"
+                                               th:field="*{nombre}"
+                                               class="form-control shadow-sm"
                                                placeholder="Ej: Comunidad de Propietarios Calle Mayor 1"
-                                               maxlength="70" required>
-                                        <small class="text-muted">Nombre legal que aparecerá en los recibos y ficheros bancarios.</small>
+                                               maxlength="70"
+                                               required>
+
+                                        <small class="text-muted">
+                                            Nombre legal que aparecerá en los recibos y ficheros bancarios.
+                                        </small>
                                     </div>
 
                                     <div class="row mb-3">
+
                                         <div class="col-md-8">
-                                            <label class="form-label fw-bold">Dirección de la Finca</label>
-                                            <input type="text" th:field="*{direccion}" class="form-control shadow-sm" placeholder="Calle, número, bloque...">
+                                            <label class="form-label fw-bold">
+                                                Dirección de la Finca
+                                            </label>
+
+                                            <input type="text"
+                                                   th:field="*{direccion}"
+                                                   class="form-control shadow-sm"
+                                                   placeholder="Calle, número, bloque..."
+                                                   maxlength="100">
                                         </div>
+
                                         <div class="col-md-4">
-                                            <label class="form-label fw-bold">Código Postal</label>
-                                            <input type="text" th:field="*{codigoPostal}" class="form-control shadow-sm" placeholder="Ej: 28001">
+                                            <label class="form-label fw-bold">
+                                                Código Postal
+                                            </label>
+
+                                            <input type="text"
+                                                   th:field="*{codigoPostal}"
+                                                   class="form-control shadow-sm"
+                                                   placeholder="Ej: 28001"
+                                                   maxlength="10">
                                         </div>
                                     </div>
 
-                                    <div class="mb-3">
-                                        <label class="form-label fw-bold">Población / Localidad</label>
-                                        <input type="text" th:field="*{poblacion}" class="form-control shadow-sm" placeholder="Ej: Madrid">
+                                    <div class="row mb-3">
+
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">
+                                                Población / Localidad
+                                            </label>
+
+                                            <input type="text"
+                                                   th:field="*{poblacion}"
+                                                   class="form-control shadow-sm"
+                                                   placeholder="Ej: Madrid"
+                                                   maxlength="50">
+                                        </div>
+
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold">
+                                                Provincia
+                                            </label>
+
+                                            <input type="text"
+                                                   th:field="*{provincia}"
+                                                   class="form-control shadow-sm"
+                                                   placeholder="Ej: Madrid"
+                                                   maxlength="40">
+                                        </div>
+
+                                        <div class="col-md-2">
+                                            <label class="form-label fw-bold">
+                                                País
+                                            </label>
+
+                                            <select th:field="*{paiscod}"
+                                                    class="form-select shadow-sm">
+                                                <option value="ES">ES</option>
+                                                <option value="PT">PT</option>
+                                                <option value="FR">FR</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
 
+                                <!-- CONFIGURACION -->
                                 <div class="mb-4 p-3 bg-light border rounded">
-                                    <h5 class="text-dark border-bottom pb-2 mb-3"><i class="bi bi-calculator me-2"></i>Configuración de Liquidaciones</h5>
+
+                                    <h5 class="text-dark border-bottom pb-2 mb-3">
+                                        <i class="bi bi-calculator me-2"></i>
+                                        Configuración de Liquidaciones
+                                    </h5>
+
                                     <div class="row">
+
                                         <div class="col-md-12">
-                                            <label class="form-label fw-bold text-primary">Sistema de Reparto de Gastos Predeterminado</label>
-                                            <select th:field="*{tipoReparto}" class="form-select border-primary shadow-sm fw-bold">
-                                                <option th:value="${T(com.sepa1914.adminservice.model.TipoReparto).PARTES_IGUALES}">A Partes Iguales (1 / N)</option>
-                                                <option th:value="${T(com.sepa1914.adminservice.model.TipoReparto).COEFICIENTE}">Por Coeficiente de Escritura (%)</option>
+
+                                            <label class="form-label fw-bold text-primary">
+                                                Sistema de Reparto de Gastos Predeterminado
+                                            </label>
+
+                                            <select th:field="*{tipoReparto}"
+                                                    class="form-select border-primary shadow-sm fw-bold">
+
+                                                <option th:value="${T(com.sepa1914.adminservice.model.TipoReparto).PARTES_IGUALES}">
+                                                    A Partes Iguales (1 / N)
+                                                </option>
+
+                                                <option th:value="${T(com.sepa1914.adminservice.model.TipoReparto).COEFICIENTE}">
+                                                    Por Coeficiente de Escritura (%)
+                                                </option>
                                             </select>
+
                                             <div class="form-text mt-2">
                                                 <i class="bi bi-info-circle-fill"></i>
-                                                Define cómo se calcularán las derramas automáticas y el reparto de facturas de proveedores.
+                                                Define cómo se calcularán las derramas automáticas
+                                                y el reparto de facturas de proveedores.
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
+                                <!-- SEPA -->
                                 <div class="mb-4">
-                                    <h5 class="text-secondary border-bottom pb-2 mb-3"><i class="bi bi-bank me-2"></i>Identificación Acreedor SEPA</h5>
 
-                                    <div class="mb-4">
-                                        <label class="form-label fw-bold text-primary">CIF / NIF de la Comunidad (AT-02)</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-primary text-white"><i class="bi bi-fingerprint"></i></span>
-                                            <input type="text" th:field="*{identificadorAcreedor}" class="form-control border-primary fw-bold"
-                                                   placeholder="Ej: G12345678" required>
+                                    <h5 class="text-secondary border-bottom pb-2 mb-3">
+                                        <i class="bi bi-bank me-2"></i>
+                                        Identificación Acreedor SEPA
+                                    </h5>
+
+                                    <div class="row mb-4">
+
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold text-primary">
+                                                CIF / NIF Comunidad
+                                            </label>
+
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-primary text-white">
+                                                    <i class="bi bi-fingerprint"></i>
+                                                </span>
+
+                                                <input type="text"
+                                                       th:field="*{nifCif}"
+                                                       class="form-control border-primary fw-bold"
+                                                       placeholder="Ej: H49142458"
+                                                       maxlength="20">
+                                            </div>
+
+                                            <div class="form-text text-info">
+                                                Dato fiscal de la comunidad.
+                                            </div>
                                         </div>
-                                        <div class="form-text text-info">
-                                            <i class="bi bi-shield-check"></i>
-                                            El sistema gestionará automáticamente el prefijo de país y dígitos de control para el fichero .c19.
+
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold text-primary">
+                                                Identificador Acreedor SEPA
+                                            </label>
+
+                                            <input type="text"
+                                                   th:field="*{identificadorAcreedor}"
+                                                   class="form-control border-primary fw-bold"
+                                                   placeholder="Ej: ES12001H49142458"
+                                                   maxlength="35"
+                                                   required>
+
+                                            <div class="form-text text-info">
+                                                Código oficial SEPA para remesas.
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold text-primary">
+                                                Sufijo SEPA
+                                            </label>
+
+                                            <input type="text"
+                                                   th:field="*{sufijo}"
+                                                   class="form-control border-primary fw-bold"
+                                                   maxlength="3"
+                                                   placeholder="000">
+
+                                            <div class="form-text text-info">
+                                                Código de 3 dígitos asignado por el banco.
+                                            </div>
                                         </div>
                                     </div>
 
                                     <div class="row mb-3">
+
                                         <div class="col-md-8">
-                                            <label class="form-label fw-bold">IBAN de la Cuenta de Cobro (AT-04)</label>
+                                            <label class="form-label fw-bold">
+                                                IBAN de la Cuenta de Cobro (AT-04)
+                                            </label>
+
                                             <div class="input-group">
-                                                <span class="input-group-text"><i class="bi bi-credit-card-2-back"></i></span>
-                                                <input type="text" th:field="*{iban}" class="form-control fw-bold"
+                                                <span class="input-group-text">
+                                                    <i class="bi bi-credit-card-2-back"></i>
+                                                </span>
+
+                                                <input type="text"
+                                                       th:field="*{iban}"
+                                                       class="form-control fw-bold"
                                                        placeholder="ESXX 0000 0000 0000 0000 0000"
-                                                       maxlength="34" required>
+                                                       maxlength="34"
+                                                       required>
                                             </div>
                                         </div>
+
                                         <div class="col-md-4">
-                                            <label class="form-label fw-bold">BIC / SWIFT</label>
-                                            <input type="text" th:field="*{bic}" class="form-control" placeholder="Opcional">
+                                            <label class="form-label fw-bold">
+                                                BIC / SWIFT
+                                            </label>
+
+                                            <input type="text"
+                                                   th:field="*{bic}"
+                                                   class="form-control"
+                                                   placeholder="Opcional"
+                                                   maxlength="11">
                                         </div>
                                     </div>
                                 </div>
 
+                                <!-- QR -->
+                                <div class="mb-4 p-3 bg-light border rounded"
+                                     th:if="${comunidad.id != null}">
+
+                                    <h5 class="text-dark border-bottom pb-2 mb-3">
+                                        <i class="bi bi-qr-code me-2"></i>
+                                        QR de Incidencias
+                                    </h5>
+
+                                    <div class="row align-items-center">
+
+                                        <div class="col-md-8">
+                                            <p class="mb-1">
+                                                Este QR permite acceder al formulario público
+                                                de incidencias de esta comunidad.
+                                            </p>
+
+                                            <small class="text-muted">
+                                                Puede imprimirse en tablones,
+                                                ascensores, actas o comunicaciones.
+                                            </small>
+                                        </div>
+
+                                        <div class="col-md-4 text-end">
+                                            <a th:href="@{/comunidades/{id}/descargar-qr(id=${comunidad.id})}"
+                                               class="btn btn-outline-primary">
+                                                <i class="bi bi-download me-1"></i>
+                                                Descargar QR
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- BOTONES -->
                                 <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-5 pt-3 border-top">
-                                    <a th:href="@{/comunidades/lista}" class="btn btn-outline-secondary me-md-2 px-4">
-                                        <i class="bi bi-x-circle me-1"></i> Cancelar
+
+                                    <a th:href="@{/comunidades/lista}"
+                                       class="btn btn-outline-secondary me-md-2 px-4">
+                                        <i class="bi bi-x-circle me-1"></i>
+                                        Cancelar
                                     </a>
-                                    <button type="submit" class="btn px-5 shadow border-0"
-                                            th:classappend="${comunidad.id != null} ? 'btn-warning text-dark' : 'btn-success text-white'">
+
+                                    <button type="submit"
+                                            class="btn px-5 shadow border-0"
+                                            th:classappend="${comunidad.id != null}
+                                                ? 'btn-warning text-dark'
+                                                : 'btn-success text-white'">
+
                                         <i class="bi bi-check-circle-fill me-1"></i>
-                                        <span th:text="${comunidad.id != null} ? ' Actualizar Comunidad' : ' Registrar Comunidad'"></span>
+
+                                        <span th:text="${comunidad.id != null}
+                                            ? ' Actualizar Comunidad'
+                                            : ' Registrar Comunidad'"></span>
                                     </button>
                                 </div>
+
                             </form>
                         </div>
                     </div>
                 </div>
             </div>
+
         </main>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

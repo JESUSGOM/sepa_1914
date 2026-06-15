@@ -33,6 +33,7 @@ public class Usuario {
     //mappedBy apunta al campo 'administrador' en la clase Comunidad.
     @OneToMany(mappedBy = "administrador", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Comunidad> comunidades = new ArrayList<>();
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "usuario_roles",
@@ -40,6 +41,10 @@ public class Usuario {
             inverseJoinColumns = @JoinColumn(name = "rol_id")
     )
     private Set<Rol> roles = new HashSet<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "administrador_id")
+    private Administrador administrador;
 
     public Usuario() {}
 
@@ -79,4 +84,12 @@ public class Usuario {
 
     public Set<Rol> getRoles() {return roles;}
     public void setRoles(Set<Rol> roles) {this.roles = roles;}
+
+    public Administrador getAdministrador() {
+        return administrador;
+    }
+
+    public void setAdministrador(Administrador administrador) {
+        this.administrador = administrador;
+    }
 }

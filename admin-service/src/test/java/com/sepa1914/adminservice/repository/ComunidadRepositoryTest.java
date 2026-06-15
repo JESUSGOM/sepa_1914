@@ -110,11 +110,11 @@ class ComunidadRepositoryTest {
     @Test
     @DisplayName("4. Buscador Predictivo: Filtra por texto (LIKE) de forma insensible a mayúsculas en Nombre/Dirección/Población")
     void buscarPorAdminYTexto_DebeCruzarCamposCorrectamente() {
-        // GIVEN: Un ecosistema de comunidades con patrones de texto específicos y aislados
+        // GIVEN: Un ecosistema de comunidades con patrones de texto limpios y sin colisiones
         crearComunidadPersistida("Residencial Los Olivos", "Avenida de Andalucía 5", "Getafe", adminAlpha);
-        crearComunidadPersistida("Urb. El Sabinar", "Calle Arbusto Silvestre 12", "Almería", adminAlpha); // Desambiguado aquí
-        crearComunidadPersistida("Finca Central", "Paseo de la Estación 2", "Olivos del Rey", adminAlpha);
-        crearComunidadPersistida("Finca Los Olivos Intruso", "Ruta 66", "Zaragoza", adminBeta); // Pertenece a Beta
+        crearComunidadPersistida("Urb. El Sabinar", "Calle Arbusto Silvestre 12", "Almería", adminAlpha);
+        crearComunidadPersistida("Finca Central", "Paseo de la Estación 2", "Madrid Centro", adminAlpha); // Población cambiada para no colisionar
+        crearComunidadPersistida("Finca Los Olivos Intruso", "Ruta 66", "Zaragoza", adminBeta);
         entityManager.flush();
 
         Pageable paginacionCompleta = PageRequest.of(0, 10);
@@ -126,12 +126,12 @@ class ComunidadRepositoryTest {
 
         // WHEN & THEN: Caso B - Coincidencia en la DIRECCIÓN ("Andalucía")
         Page<Comunidad> porDireccion = comunidadRepository.buscarPorAdminYTexto(adminAlpha, "Andalucía", paginacionCompleta);
-        assertEquals(1, porDireccion.getContent().size(), "Debería encontrar la comunidad por la dirección.");
+        assertEquals(1, porDireccion.getContent().size());
         assertEquals("Residencial Los Olivos", porDireccion.getContent().get(0).getNombre());
 
-        // WHEN & THEN: Caso C - Coincidencia en la POBLACIÓN ("rey")
-        Page<Comunidad> porPoblacion = comunidadRepository.buscarPorAdminYTexto(adminAlpha, "rey", paginacionCompleta);
-        assertEquals(1, porPoblacion.getContent().size(), "Debería encontrar la comunidad por la población.");
+        // WHEN & THEN: Caso C - Coincidencia en la POBLACIÓN ("Madrid")
+        Page<Comunidad> porPoblacion = comunidadRepository.buscarPorAdminYTexto(adminAlpha, "Madrid", paginacionCompleta);
+        assertEquals(1, porPoblacion.getContent().size());
         assertEquals("Finca Central", porPoblacion.getContent().get(0).getNombre());
     }
 
