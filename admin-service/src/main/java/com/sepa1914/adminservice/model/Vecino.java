@@ -3,7 +3,6 @@ package com.sepa1914.adminservice.model;
 import com.sepa1914.adminservice.util.AesEncryptor;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -93,10 +92,10 @@ public class Vecino {
 
     // LÓGICA DE ESTADOS (Mantenemos boolean primitivo para evitar nulos accidentales)
     @Column(nullable = false)
-    private boolean domiciliado = true;
+    private Boolean domiciliado = true;
 
     @Column(name = "envio_digital", nullable = false)
-    private boolean envioDigital = true;
+    private Boolean envioDigital = true;
 
     @Column(nullable = false)
     private boolean activo = true;
@@ -320,19 +319,17 @@ public class Vecino {
         this.coeficiente = coeficiente;
     }
 
-    public boolean isDomiciliado() {
-        return domiciliado;
-    }
+    public Boolean getDomiciliado() {return domiciliado;}
 
-    public void setDomiciliado(boolean domiciliado) {
-        this.domiciliado = domiciliado;
-    }
+    public boolean isDomiciliado() {return Boolean.TRUE.equals(domiciliado);}
 
-    public boolean isEnvioDigital() {
+    public void setDomiciliado(Boolean domiciliado) {this.domiciliado = domiciliado;}
+
+    public Boolean isEnvioDigital() {
         return envioDigital;
     }
 
-    public void setEnvioDigital(boolean envioDigital) {
+    public void setEnvioDigital(Boolean envioDigital) {
         this.envioDigital = envioDigital;
     }
 

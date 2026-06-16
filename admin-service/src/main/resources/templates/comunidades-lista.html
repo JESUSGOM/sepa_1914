@@ -207,7 +207,26 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Presentador de la remesa:</label>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">
+                                Formato de remesa:
+                            </label>
+
+                            <select
+                                    name="formatoRemesa"
+                                    class="form-select form-select-sm">
+
+                                <option value="c19" selected>
+                                    Cuaderno 19 (.c19)
+                                </option>
+
+                                <option value="xml">
+                                    XML SEPA ISO 20022 (.xml)
+                                </option>
+
+                            </select>
+                        </div>
 
                         <select name="cuentaPresentadorId" class="form-select form-select-sm">
                             <option value="">La comunidad como presentador</option>

@@ -493,14 +493,25 @@ public class ComunidadController {
 
     @PostMapping("/generar-remesa")
     public ResponseEntity<byte[]> generarRemesa(
+
             @RequestParam("comunidadId") Long id,
+
             @RequestParam("fechaVencimiento")
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate fechaVencimiento,
+
             @RequestParam("mes") int mes,
             @RequestParam("anio") int anio,
-            @RequestParam(value = "sustituir", defaultValue = "false") boolean sustituir,
-            @RequestParam(value = "cuentaPresentadorId", required = false) Long cuentaPresentadorId,
+
+            @RequestParam(value = "sustituir", defaultValue = "false")
+            boolean sustituir,
+
+            @RequestParam(value = "cuentaPresentadorId", required = false)
+            Long cuentaPresentadorId,
+
+            @RequestParam(value = "formatoRemesa", defaultValue = "c19")
+            String formatoRemesa,
+
             Authentication auth) {
 
         if (!licenseService.validarLicencia()) {
@@ -537,15 +548,33 @@ public class ComunidadController {
 
         List<Vecino> vecinos = vecinoRepository.findByComunidad(comunidad);
 
-        String contenido = sepaService.generarCuaderno19(
-                comunidad,
-                vecinos,
-                fechaVencimiento,
-                "ORDINARIA",
-                null,
-                sustituir,
-                cuentaPresentadorId
-        );
+        String contenido;
+        String extension;
+
+        if ("xml".equalsIgnoreCase(formatoRemesa)) {
+
+            contenido = sepaXmlService.generarPain008(
+                    comunidad,
+                    vecinos,
+                    fechaVencimiento
+            );
+
+            extension = ".xml";
+
+        } else {
+
+            contenido = sepaService.generarCuaderno19(
+                    comunidad,
+                    vecinos,
+                    fechaVencimiento,
+                    "ORDINARIA",
+                    null,
+                    sustituir,
+                    cuentaPresentadorId
+            );
+
+            extension = ".c19";
+        }
 
         BigDecimal totalRemesa = vecinos.stream()
                 .filter(Vecino::isDomiciliado)
@@ -562,8 +591,10 @@ public class ComunidadController {
                 "REMESA_" +
                         normalizarNombreFichero(comunidad.getNombre()) +
                         "_" +
-                        fechaVencimiento.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) +
-                        ".c19"
+                        fechaVencimiento.format(
+                                DateTimeFormatter.ofPattern("dd-MM-yyyy")
+                        ) +
+                        extension
         );
         historico.setContenido(contenido);
 
